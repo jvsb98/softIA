@@ -64,7 +64,7 @@ function useRealtimeBridge() {
     }
     const onStatus = (m: any) => {
       qc.setQueryData(['messages', m.conversation_id], (old: any) =>
-        old ? { ...old, messages: old.messages.map((x: any) => (x.id === m.id ? { ...x, status: m.status, error: m.error } : x)) } : old,
+        old ? { ...old, messages: old.messages.map((x: any) => (x.id === m.id ? { ...x, ...Object.fromEntries(Object.entries(m).filter(([, v]) => v !== undefined)) } : x)) } : old,
       )
     }
     const onEvent = (e: any) => {

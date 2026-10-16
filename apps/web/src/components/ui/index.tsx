@@ -134,7 +134,7 @@ export function Badge({ children, tone = 'neutral', className }: { children: Rea
     ok: 'bg-ok/12 text-ok',
     warn: 'bg-warn/15 text-warn',
   }
-  return <span className={cx('inline-flex items-center gap-1 rounded-[5px] px-1.5 py-0.5 text-[11.5px] font-medium leading-none', tones[tone], className)}>{children}</span>
+  return <span className={cx('inline-flex items-center gap-1 whitespace-nowrap rounded-[5px] px-1.5 py-0.5 text-[11.5px] font-medium leading-none', tones[tone], className)}>{children}</span>
 }
 
 export function TagChip({ name, color }: { name: string; color: string }) {

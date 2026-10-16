@@ -12,3 +12,4 @@ apps/desktop/out/
 deploy/windows/build/
 .DS_Store
 Thumbs.db
+apps/server/src/dev-simulate.ts
