@@ -12,8 +12,9 @@ export type AutomationHandler = (conv: any, reason: string) => Promise<boolean>
 const handlers: { name: string; fn: AutomationHandler }[] = []
 
 /** Registra um manipulador. O primeiro que retornar true "assume" a conversa. */
-export function registerAutomation(name: string, fn: AutomationHandler) {
-  handlers.push({ name, fn })
+export function registerAutomation(name: string, fn: AutomationHandler, opts: { first?: boolean } = {}) {
+  if (opts.first) handlers.unshift({ name, fn })
+  else handlers.push({ name, fn })
 }
 
 export async function runAutomation(conversationId: string, reason = 'inbound') {

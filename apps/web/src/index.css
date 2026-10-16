@@ -172,3 +172,31 @@ body {
     transition-duration: 0.001ms !important;
   }
 }
+
+/* React Flow com as cores da marca (claro e escuro) */
+.react-flow {
+  --xy-background-color: var(--sunken);
+  --xy-node-background-color: var(--panel);
+  --xy-controls-button-background-color: var(--panel);
+  --xy-controls-button-background-color-hover: var(--panel-2);
+  --xy-controls-button-color: var(--ink-2);
+  --xy-controls-button-border-color: var(--line);
+  --xy-minimap-background-color: var(--panel);
+  --xy-edge-stroke: var(--line-strong);
+  --xy-connectionline-stroke: var(--coral);
+  --xy-attribution-background-color: transparent;
+}
+.react-flow__controls {
+  border-radius: 10px;
+  overflow: hidden;
+  box-shadow: var(--shadow);
+}
+.react-flow__minimap {
+  border-radius: 10px;
+  overflow: hidden;
+  border: 1px solid var(--line);
+}
+.react-flow__node.selected,
+.react-flow__node:focus-visible {
+  outline: none;
+}

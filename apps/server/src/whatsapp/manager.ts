@@ -206,6 +206,7 @@ class Manager {
         await q(`UPDATE jobs SET status='done', finished_at=now(), last_error='cancelado: resposta pelo celular' WHERE status='queued' AND group_key=$1`, [
           `conv:${conv.id}`,
         ])
+        await q(`UPDATE flow_runs SET status='cancelled', ended_at=now(), error='resposta pelo celular' WHERE conversation_id=$1 AND status IN ('running','waiting')`, [conv.id]).catch(() => {})
         await logEvent(conv.id, 'phone.reply', { type: 'phone' }, { note: 'Resposta enviada pelo celular — automação pausada' })
         await broadcastConversation(conv.id)
       }

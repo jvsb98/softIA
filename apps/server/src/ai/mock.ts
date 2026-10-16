@@ -104,7 +104,7 @@ export async function mockChat(r: ChatRequest): Promise<ChatResult> {
   const parts: string[] = []
   if (firstTurn) parts.push('Olá! Sou o assistente virtual da Nimber.')
   if (snippet) parts.push(snippet)
-  else if (!firstTurn && !next) parts.push('Entendi! Vou te passar para um especialista que pode detalhar isso melhor.')
+  else if (!firstTurn && !next) parts.push('Obrigado pelas informações! Posso te ajudar com mais alguma dúvida sobre a Nimber?')
   if (next) parts.push(next)
   else if (firstTurn && !snippet) parts.push('Como posso te ajudar hoje?')
   return { text: parts.join('\n\n'), toolCalls, usage }

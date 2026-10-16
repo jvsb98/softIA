@@ -119,3 +119,30 @@ export async function applyCriteria(contactId: string, values: Record<string, an
     targetSectorSlug: settings.targetSectorSlug,
   }
 }
+
+/** Versão em memória (simulador): mesmo cálculo, sem gravar no banco. */
+export async function applyCriteriaInMemory(contact: any, values: Record<string, any>) {
+  const criteria = await activeCriteria()
+  const settings = await getSetting('qualification', { enabled: true, threshold: 22, targetSectorSlug: 'closer', disqualifyBelow: null as number | null })
+  const profile = { ...(contact.lead_profile ?? {}) }
+  const valid = new Set(criteria.map((c) => c.key))
+  for (const [k, v] of Object.entries(values ?? {})) if (valid.has(k) && v !== null && v !== undefined && v !== '') profile[k] = v
+  const r = computeScore(criteria, profile)
+  const qualified = settings.enabled && r.total >= settings.threshold
+  const disqualified = !qualified && (!!r.disqualifiedBy || (r.missing.length === 0 && settings.disqualifyBelow != null && r.total < settings.disqualifyBelow))
+  contact.lead_profile = profile
+  contact.score = r.lines.length ? r.total : null
+  contact.score_breakdown = r.lines
+  contact.lead_status = qualified ? 'qualificado' : disqualified ? 'desqualificado' : 'em_qualificacao'
+  return {
+    score: r.total,
+    threshold: settings.threshold,
+    qualified,
+    disqualified,
+    disqualifiedBy: r.disqualifiedBy,
+    complete: r.missing.length === 0,
+    breakdown: r.lines,
+    next: r.missing[0] ?? null,
+    targetSectorSlug: settings.targetSectorSlug,
+  }
+}

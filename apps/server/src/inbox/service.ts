@@ -389,6 +389,7 @@ export async function transfer(
     reason: reason ?? null,
   })
   // Cancela automações pendentes da conversa (fluxo/IA) — o humano assume.
+  await q(`UPDATE flow_runs SET status='cancelled', ended_at=now(), error='transferida' WHERE conversation_id=$1 AND status IN ('running','waiting')`, [conversationId]).catch(() => {})
   await q(`UPDATE jobs SET status='done', finished_at=now(), last_error='cancelado: transferência' WHERE status='queued' AND group_key=$1 AND queue='conversation.process'`, [`conv:${conversationId}`])
   const fresh = (await getConversation(conversationId))!
   if (target.userId) {
@@ -426,6 +427,7 @@ export async function closeConversation(conversationId: string, actor: Actor, re
     [conversationId, actor.type === 'agent' ? actor.id : null, reason ?? null],
   )
   if (!conv) return null
+  await q(`UPDATE flow_runs SET status='cancelled', ended_at=now(), error='encerrada' WHERE conversation_id=$1 AND status IN ('running','waiting')`, [conversationId]).catch(() => {})
   await q(`UPDATE jobs SET status='done', finished_at=now(), last_error='cancelado: encerramento' WHERE status='queued' AND group_key=$1`, [
     `conv:${conversationId}`,
   ])

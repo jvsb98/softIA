@@ -12,6 +12,8 @@ import { registerOutboundWorker } from './inbox/outbound.js'
 import { registerRetention } from './ops/retention.js'
 import { aiRoutes } from './http/routes/ai.js'
 import { registerAi } from './ai/automation.js'
+import { flowRoutes } from './http/routes/flows.js'
+import { registerFlowRuntime } from './flows/runtime.js'
 
 export async function registerModules(app: FastifyInstance, cfg: AppConfig) {
   const secure = cfg.server.publicUrl.startsWith('https://')
@@ -20,9 +22,11 @@ export async function registerModules(app: FastifyInstance, cfg: AppConfig) {
   await adminRoutes(app)
   await inboxRoutes(app)
   await aiRoutes(app)
+  await flowRoutes(app)
 
   registerOutboundWorker()
   registerAutomationWorker()
   registerRetention()
   registerAi()
+  registerFlowRuntime()
 }

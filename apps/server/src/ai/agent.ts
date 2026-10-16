@@ -16,7 +16,7 @@ import { emitConversation } from '../http/realtime.js'
 import { checkCompliance, RULE_LABEL, withDisclaimer } from './guard.js'
 import { formatKbContext, searchKb } from './kb.js'
 import { parseJsonLoose, type ChatMessage, type ToolDef } from './providers.js'
-import { activeCriteria, applyCriteria, criteriaToolSchema } from './qualification.js'
+import { activeCriteria, applyCriteria, applyCriteriaInMemory, criteriaToolSchema } from './qualification.js'
 import { AiUnavailable, runChat } from './router.js'
 
 // ---------------------------------------------------------------- extensões (ferramentas extras)
@@ -232,7 +232,7 @@ export async function runAgentTurn(conv: ConversationRow, opts: TurnOptions): Pr
       },
     },
   ]
-  if (criteria.length && !opts.dryRun?.contact?.__noCriteria) {
+  if (criteria.length) {
     tools.push({
       name: 'registrar_criterios',
       description: 'Registra respostas do contato aos critérios de qualificação assim que ele informar algo. Retorna o score atual e a próxima pergunta sugerida.',
@@ -248,8 +248,9 @@ export async function runAgentTurn(conv: ConversationRow, opts: TurnOptions): Pr
       return { ok: true, instrucao: 'Escreva uma mensagem curta avisando que um especialista vai continuar o atendimento.' }
     }
     if (name === 'registrar_criterios') {
-      if (!contact?.id) return { ok: false }
-      qual = await applyCriteria(contact.id, args?.valores ?? {})
+      if (opts.dryRun) qual = await applyCriteriaInMemory(contact, args?.valores ?? {})
+      else if (contact?.id) qual = await applyCriteria(contact.id, args?.valores ?? {})
+      else return { ok: false }
       return {
         score: qual.score,
         qualificado: qual.qualified,
