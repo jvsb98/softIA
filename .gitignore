@@ -1,0 +1,14 @@
+node_modules/
+dist/
+release/
+*.log
+.env
+config/database.txt
+config/master.key
+data/
+apps/web/dist/
+apps/desktop/dist/
+apps/desktop/out/
+deploy/windows/build/
+.DS_Store
+Thumbs.db
