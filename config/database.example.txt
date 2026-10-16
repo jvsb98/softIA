@@ -1,0 +1,19 @@
+# ==========================================================
+#  Nimber Atende — conexão com o banco de dados (PostgreSQL)
+# ==========================================================
+#  Copie este arquivo para "database.txt" (na mesma pasta) e preencha.
+#  No Windows, a senha é protegida automaticamente (DPAPI) na primeira
+#  execução: a linha PASSWORD passa a começar com "dpapi:".
+
+HOST=localhost
+PORT=5432
+DATABASE=nimber_atende
+USER=nimber_atende
+PASSWORD=troque-esta-senha
+
+# SSL: false | true | no-verify   (DigitalOcean gerenciado: true + SSL_CA)
+SSL=false
+# SSL_CA=ca-certificate.crt
+
+POOL_MAX=15
+SCHEMA=public

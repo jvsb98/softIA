@@ -1,0 +1,6 @@
+# Opções do servidor (opcional) — copie para "server.txt"
+PORT=8080
+HOST=0.0.0.0
+PUBLIC_URL=http://localhost:8080
+TRUST_PROXY=false
+LOG_LEVEL=info

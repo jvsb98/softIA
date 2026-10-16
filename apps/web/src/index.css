@@ -1,0 +1,174 @@
+@import '@fontsource/dm-sans/400.css';
+@import '@fontsource/dm-sans/500.css';
+@import '@fontsource/dm-sans/600.css';
+@import '@fontsource/dm-sans/700.css';
+@import '@fontsource/tinos/400.css';
+@import '@fontsource/tinos/700.css';
+@import 'tailwindcss';
+
+/*
+ * Nimber Atende — tokens visuais (Brand Platform 2026)
+ *   Navy Capital #071832 · Linen Base #F6F1E7 · Ember Coral #FE5A51
+ *   Core Black #020515 · Nimbus Blue #99C1E4
+ * Coral marca ação humana/primária; Nimbus marca tudo que é IA/automação.
+ */
+@custom-variant dark (&:where([data-theme='dark'], [data-theme='dark'] *));
+
+:root {
+  --bg: #f6f1e7;
+  --panel: #fffdf8;
+  --panel-2: #efe8da;
+  --sunken: #ebe3d3;
+  --ink: #071832;
+  --ink-2: #33415c;
+  --muted: #6b7489;
+  --line: rgb(7 24 50 / 0.1);
+  --line-strong: rgb(7 24 50 / 0.18);
+  --coral: #fe5a51;
+  --coral-ink: #c8352d;
+  --coral-soft: rgb(254 90 81 / 0.12);
+  --nimbus: #99c1e4;
+  --nimbus-ink: #2b6597;
+  --nimbus-soft: rgb(153 193 228 / 0.28);
+  --ok: #2f8a5b;
+  --warn: #b7791f;
+  --bubble-in: #fffdf8;
+  --bubble-out: #071832;
+  --bubble-out-ink: #f6f1e7;
+  --bubble-note: #fff3c4;
+  --shadow: 0 1px 0 rgb(7 24 50 / 0.04), 0 8px 24px -12px rgb(7 24 50 / 0.18);
+  color-scheme: light;
+}
+
+[data-theme='dark'] {
+  --bg: #020515;
+  --panel: #071832;
+  --panel-2: #0c2242;
+  --sunken: #040b20;
+  --ink: #f6f1e7;
+  --ink-2: #c9cfdc;
+  --muted: #8d99b2;
+  --line: rgb(246 241 231 / 0.09);
+  --line-strong: rgb(246 241 231 / 0.16);
+  --coral: #fe5a51;
+  --coral-ink: #ff8a83;
+  --coral-soft: rgb(254 90 81 / 0.16);
+  --nimbus: #99c1e4;
+  --nimbus-ink: #b9d6ef;
+  --nimbus-soft: rgb(153 193 228 / 0.14);
+  --ok: #5fc58d;
+  --warn: #e5b45a;
+  --bubble-in: #0c2242;
+  --bubble-out: #f6f1e7;
+  --bubble-out-ink: #071832;
+  --bubble-note: #3a3420;
+  --shadow: 0 1px 0 rgb(0 0 0 / 0.2), 0 10px 30px -12px rgb(0 0 0 / 0.6);
+  color-scheme: dark;
+}
+
+@theme {
+  --font-sans: 'DM Sans', ui-sans-serif, system-ui, sans-serif;
+  --font-serif: 'Tinos', 'Times New Roman', serif;
+  --color-bg: var(--bg);
+  --color-panel: var(--panel);
+  --color-panel-2: var(--panel-2);
+  --color-sunken: var(--sunken);
+  --color-ink: var(--ink);
+  --color-ink-2: var(--ink-2);
+  --color-muted: var(--muted);
+  --color-line: var(--line);
+  --color-line-strong: var(--line-strong);
+  --color-coral: var(--coral);
+  --color-coral-ink: var(--coral-ink);
+  --color-coral-soft: var(--coral-soft);
+  --color-nimbus: var(--nimbus);
+  --color-nimbus-ink: var(--nimbus-ink);
+  --color-nimbus-soft: var(--nimbus-soft);
+  --color-ok: var(--ok);
+  --color-warn: var(--warn);
+  --color-navy: #071832;
+  --color-linen: #f6f1e7;
+  --color-core: #020515;
+  --shadow-panel: var(--shadow);
+  --radius-sm: 6px;
+  --radius-md: 10px;
+  --radius-lg: 14px;
+}
+
+@layer base {
+html,
+body,
+#root {
+  height: 100%;
+}
+
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--ink);
+  font-family: var(--font-sans);
+  font-size: 14px;
+  line-height: 1.45;
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+
+::selection {
+  background: var(--coral-soft);
+}
+
+:focus-visible {
+  outline: 2px solid var(--coral);
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+
+* {
+  scrollbar-width: thin;
+  scrollbar-color: var(--line-strong) transparent;
+}
+
+}
+
+.font-display {
+  font-family: var(--font-serif);
+  letter-spacing: -0.01em;
+}
+
+/* Fundo do painel de mensagens: grade de "frações" do sistema de marca, bem discreta */
+.chat-canvas {
+  background-color: var(--sunken);
+  background-image:
+    linear-gradient(var(--line) 1px, transparent 1px),
+    linear-gradient(90deg, var(--line) 1px, transparent 1px);
+  background-size: 28px 28px;
+  background-position: -1px -1px;
+}
+
+@keyframes na-pulse {
+  0%,
+  100% {
+    opacity: 0.35;
+  }
+  50% {
+    opacity: 1;
+  }
+}
+.na-typing span {
+  animation: na-pulse 1.1s infinite;
+}
+.na-typing span:nth-child(2) {
+  animation-delay: 0.15s;
+}
+.na-typing span:nth-child(3) {
+  animation-delay: 0.3s;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.001ms !important;
+    transition-duration: 0.001ms !important;
+  }
+}

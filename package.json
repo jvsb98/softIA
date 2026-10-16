@@ -1,0 +1,26 @@
+{
+  "name": "nimber-atende",
+  "private": true,
+  "version": "1.0.0",
+  "description": "Nimber Atende — atendimento omnicanal no WhatsApp com IA, multiatendente e construtor de fluxos",
+  "workspaces": [
+    "apps/server",
+    "apps/web"
+  ],
+  "scripts": {
+    "dev:server": "npm run dev -w apps/server",
+    "dev:web": "npm run dev -w apps/web",
+    "build": "npm run build -w apps/web && npm run build -w apps/server",
+    "typecheck": "npm run typecheck -w apps/server && npm run typecheck -w apps/web",
+    "test": "npm test -w apps/server",
+    "migrate": "npm run migrate -w apps/server",
+    "start": "npm start -w apps/server",
+    "postinstall": "patch-package"
+  },
+  "engines": {
+    "node": ">=22"
+  },
+  "devDependencies": {
+    "patch-package": "^8.0.1"
+  }
+}
