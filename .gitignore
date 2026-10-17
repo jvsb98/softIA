@@ -16,3 +16,6 @@ deploy/windows/build/
 Thumbs.db
 apps/server/src/dev-simulate.ts
 out/
+.diagnostico/
+backup-antes-*/
+diagnostico-nimber-atende.txt
