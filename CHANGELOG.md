@@ -2,6 +2,16 @@
 
 Todas as mudanças relevantes do Nimber Atende. Formato baseado em [Keep a Changelog](https://keepachangelog.com/pt-BR/1.1.0/); versões seguem [SemVer](https://semver.org/lang/pt-BR/).
 
+## [1.0.3] — 2026-10-17
+
+### Corrigido
+- A página principal ficava 1 hora em cache no navegador (`max-age=3600`): depois de atualizar, o navegador podia continuar com a página antiga, apontando para arquivos que não existem mais. Agora a página é sempre revalidada e só os arquivos com hash (`/assets`) ficam em cache.
+- Arquivo inexistente (ex.: script antigo do painel) respondia com a página HTML e status 200; o navegador recusava como script e a tela ficava em branco sem mensagem. Agora responde 404.
+
+### Adicionado
+- Vigia de carregamento (`boot.js`): se o painel não abrir ou parar com erro, a tela mostra o motivo, o teste dos arquivos e os botões "Recarregar sem cache" e "Copiar diagnóstico". Na primeira falha recarrega sozinho.
+- Atualizador com autoteste: encerra servidores antigos do projeto, recompila do zero, sobe o servidor, testa as respostas HTTP e abre o painel num navegador sem interface (Edge/Chrome), gerando `diagnostico-nimber-atende.txt`.
+
 ## [1.0.2] — 2026-10-16
 
 ### Corrigido

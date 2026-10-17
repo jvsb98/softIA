@@ -1,7 +1,7 @@
 {
   "name": "nimber-atende",
   "private": true,
-  "version": "1.0.2",
+  "version": "1.0.3",
   "description": "Nimber Atende — atendimento omnicanal no WhatsApp com IA, multiatendente e construtor de fluxos",
   "workspaces": [
     "apps/server",

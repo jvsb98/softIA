@@ -149,12 +149,29 @@ export async function buildApp(cfg: AppConfig): Promise<FastifyInstance> {
   ].find((p) => p && existsSync(join(p, 'index.html')))
 
   if (webDist) {
-    await app.register(fstatic, { root: webDist, prefix: '/', wildcard: true, maxAge: '1h', index: false })
+    // Cache: a página (index.html) é sempre revalidada, para que uma atualização apareça na hora;
+    // os arquivos de /assets têm o hash do conteúdo no nome e podem ficar em cache por 1 ano.
+    await app.register(fstatic, {
+      root: webDist,
+      prefix: '/',
+      wildcard: true,
+      index: false,
+      cacheControl: false,
+      setHeaders: (reply, filePath) => {
+        reply.header('Cache-Control', /[\\/]assets[\\/]/.test(filePath) ? 'public, max-age=31536000, immutable' : 'no-cache')
+      },
+    })
     // A raiz é uma pasta: sem esta rota o plugin responde 403 em "/"
-    app.get('/', (_req, reply) => reply.header('Cache-Control', 'no-cache').sendFile('index.html'))
+    app.get('/', (_req, reply) => reply.sendFile('index.html'))
     app.setNotFoundHandler((req, reply) => {
-      if (req.url.startsWith('/api/') || req.url.startsWith('/socket.io')) return reply.status(404).send({ error: 'Rota não encontrada' })
-      return reply.header('Cache-Control', 'no-cache').sendFile('index.html')
+      const path = req.url.split('?')[0] ?? ''
+      if (path.startsWith('/api/') || path.startsWith('/socket.io')) return reply.status(404).send({ error: 'Rota não encontrada' })
+      // Arquivo que não existe (ex.: /assets/index-antigo.js depois de uma atualização) responde 404 de verdade.
+      // Devolver a página no lugar fazia o navegador receber HTML onde esperava JavaScript, e a tela ficava em branco.
+      if (path.startsWith('/assets/') || /\.[a-z0-9]{1,8}$/i.test(path)) {
+        return reply.status(404).header('Cache-Control', 'no-store').type('text/plain; charset=utf-8').send('Arquivo não encontrado')
+      }
+      return reply.sendFile('index.html')
     })
     log().info({ webDist }, 'Front-end servido pelo servidor')
   } else {
