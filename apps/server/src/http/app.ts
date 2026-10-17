@@ -86,6 +86,9 @@ export async function buildApp(cfg: AppConfig): Promise<FastifyInstance> {
         fontSrc: ["'self'", 'data:', 'https://fonts.gstatic.com'],
         scriptSrc: ["'self'"],
         frameAncestors: ["'self'"],
+        // Sem HTTPS (rede interna por IP ou nome da máquina), não forçar https nos arquivos do painel:
+        // o navegador tentaria https://servidor:8080 e a página ficaria em branco.
+        ...(cfg.server.publicUrl.startsWith('https://') ? {} : { upgradeInsecureRequests: null }),
       },
     },
     hsts: cfg.server.publicUrl.startsWith('https://') ? undefined : false,

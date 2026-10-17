@@ -94,8 +94,16 @@ export function SetupPage() {
   )
 }
 
+/**
+ * Depois do login, abre o painel com um carregamento completo da página (em vez de trocar a tela no lugar).
+ * Evita que extensões do navegador que mexem nos campos de login (gerenciador de senhas, tradutor)
+ * deixem a página em branco na transição.
+ */
+function openPanel() {
+  window.location.replace('/atendimento')
+}
+
 export function LoginPage() {
-  const { refresh } = useSession()
   const [step, setStep] = useState<'password' | 'code'>('password')
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
@@ -109,10 +117,10 @@ export function LoginPage() {
       if (step === 'password') {
         const r = await api.post<{ mfaRequired: boolean }>('/api/auth/login', { email, password })
         if (r.mfaRequired) setStep('code')
-        else await refresh()
+        else openPanel()
       } else {
         await api.post('/api/auth/2fa/verify', { code })
-        await refresh()
+        openPanel()
       }
     } catch (err: any) {
       toast.error(err.message)
@@ -208,6 +216,7 @@ export function TwoFactorSetupPage({ mandatory, onDone }: { mandatory?: boolean;
             variant="primary"
             className="flex-1"
             onClick={async () => {
+              if (mandatory) return openPanel()
               await refresh()
               onDone?.()
             }}

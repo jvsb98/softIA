@@ -2,6 +2,15 @@
 
 Todas as mudanças relevantes do Nimber Atende. Formato baseado em [Keep a Changelog](https://keepachangelog.com/pt-BR/1.1.0/); versões seguem [SemVer](https://semver.org/lang/pt-BR/).
 
+## [1.0.2] — 2026-10-16
+
+### Corrigido
+- Tela em branco depois do login com 2FA: o painel agora abre com um carregamento completo da página após o login (extensões do navegador que mexem nos campos de senha não derrubam mais a transição) e a tradução automática do navegador fica desligada.
+- Acesso pela rede por IP ou nome da máquina (sem HTTPS) deixava a página em branco: a política de segurança forçava `https` nos arquivos do painel. Agora isso só vale quando o endereço público é HTTPS.
+
+### Adicionado
+- Proteção contra erros de tela: em vez de página vazia, o painel mostra a mensagem do erro com as opções Recarregar, Copiar mensagem e Sair. Conflitos causados por extensões recarregam a página sozinhos.
+
 ## [1.0.1] — 2026-10-16
 
 ### Corrigido
