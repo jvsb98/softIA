@@ -2,9 +2,9 @@ import { useQueryClient } from '@tanstack/react-query'
 import { ChevronDown, ChevronUp, RefreshCw, Sparkles } from 'lucide-react'
 import { useState } from 'react'
 import { toast } from 'sonner'
-import { Button, cx, PixelGlyph } from '@/components/ui'
-import { api } from '@/lib/api'
-import { LEAD_STATUS } from '@/lib/format'
+import { Button, cx, PixelGlyph } from '../../components/ui'
+import { api } from '../../lib/api'
+import { LEAD_STATUS } from '../../lib/format'
 
 /** Cartão de contexto gerado pela IA na transferência + botão "Sugerir resposta". */
 export function AiAssistBar({ conversation, onUseDraft }: { conversation: any; onUseDraft: (text: string) => void }) {

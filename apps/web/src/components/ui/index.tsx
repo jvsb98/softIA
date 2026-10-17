@@ -11,7 +11,7 @@ import {
   type TextareaHTMLAttributes,
 } from 'react'
 import { createPortal } from 'react-dom'
-import { initials } from '@/lib/format'
+import { initials } from '../../lib/format'
 
 export const cx = clsx
 

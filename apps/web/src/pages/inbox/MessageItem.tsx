@@ -1,8 +1,8 @@
 import { AlertCircle, ArrowRightLeft, Bot, Check, CheckCheck, Clock, FileText, RotateCw, ShieldAlert, Smartphone, Workflow } from 'lucide-react'
 import { toast } from 'sonner'
-import { cx } from '@/components/ui'
-import { api } from '@/lib/api'
-import { bytes, clock } from '@/lib/format'
+import { cx } from '../../components/ui'
+import { api } from '../../lib/api'
+import { bytes, clock } from '../../lib/format'
 
 const SENDER_LABEL: Record<string, string> = {
   ai: 'Assistente IA',

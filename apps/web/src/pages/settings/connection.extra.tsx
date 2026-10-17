@@ -1,7 +1,7 @@
 import { useQuery } from '@tanstack/react-query'
 import type { ComponentType } from 'react'
-import { Field, Select } from '@/components/ui'
-import { api } from '@/lib/api'
+import { Field, Select } from '../../components/ui'
+import { api } from '../../lib/api'
 
 function EntryFlowField({ value, onChange }: { value: any; onChange: (patch: any) => void }) {
   const flows = useQuery({ queryKey: ['flows'], queryFn: () => api.get<any[]>('/api/flows') })

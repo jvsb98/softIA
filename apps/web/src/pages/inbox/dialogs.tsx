@@ -2,10 +2,10 @@ import { useQueryClient } from '@tanstack/react-query'
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { toast } from 'sonner'
-import { Button, Dialog, Field, Input, Select, Textarea } from '@/components/ui'
-import { api } from '@/lib/api'
-import { useConnections, useSectors, useUsers } from '@/lib/queries'
-import { useSession } from '@/lib/session'
+import { Button, Dialog, Field, Input, Select, Textarea } from '../../components/ui'
+import { api } from '../../lib/api'
+import { useConnections, useSectors, useUsers } from '../../lib/queries'
+import { useSession } from '../../lib/session'
 
 export function TransferDialog({ open, onClose, conversation }: { open: boolean; onClose: () => void; conversation: any }) {
   const sectors = useSectors()

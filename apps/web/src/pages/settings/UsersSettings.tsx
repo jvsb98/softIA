@@ -2,11 +2,11 @@ import { useQueryClient } from '@tanstack/react-query'
 import { KeyRound, Lock, Plus, ShieldOff } from 'lucide-react'
 import { useState } from 'react'
 import { toast } from 'sonner'
-import { Avatar, Badge, Button, cx, Dialog, Field, Input, PageHeader, Select, Spinner, Switch, Table } from '@/components/ui'
-import { api } from '@/lib/api'
-import { ago } from '@/lib/format'
-import { useSectors, useUsers } from '@/lib/queries'
-import { useSession } from '@/lib/session'
+import { Avatar, Badge, Button, cx, Dialog, Field, Input, PageHeader, Select, Spinner, Switch, Table } from '../../components/ui'
+import { api } from '../../lib/api'
+import { ago } from '../../lib/format'
+import { useSectors, useUsers } from '../../lib/queries'
+import { useSession } from '../../lib/session'
 
 const ROLES: Record<string, { label: string; help: string }> = {
   admin: { label: 'Administrador', help: 'Acesso total: conexões, usuários, integrações, IA e segurança.' },

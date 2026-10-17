@@ -1,11 +1,11 @@
 import { Paperclip, Send, StickyNote, X, Zap } from 'lucide-react'
 import { useEffect, useMemo, useRef, useState, type KeyboardEvent } from 'react'
 import { toast } from 'sonner'
-import { cx, IconButton, Kbd } from '@/components/ui'
-import { api } from '@/lib/api'
-import { contactName } from '@/lib/format'
-import { useQuickReplies } from '@/lib/queries'
-import { getSocket } from '@/lib/socket'
+import { cx, IconButton, Kbd } from '../../components/ui'
+import { api } from '../../lib/api'
+import { contactName } from '../../lib/format'
+import { useQuickReplies } from '../../lib/queries'
+import { getSocket } from '../../lib/socket'
 
 export function Composer({
   conversation,

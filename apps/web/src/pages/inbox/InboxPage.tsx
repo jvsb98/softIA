@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
-import { Spinner } from '@/components/ui'
+import { Spinner } from '../../components/ui'
 import { ContextPanel, useConversation } from './ContextPanel'
 import { ConversationList } from './ConversationList'
 import { ConversationView, NoConversation } from './ConversationView'

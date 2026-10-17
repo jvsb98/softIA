@@ -20,12 +20,10 @@ export interface Me {
   org: { name: string }
 }
 
-const Ctx = createContext<{ me: Me | null; loading: boolean; refresh: () => Promise<unknown>; logout: () => Promise<void> }>({
-  me: null,
-  loading: true,
-  refresh: async () => {},
-  logout: async () => {},
-})
+type SessionCtx = { me: Me | null; loading: boolean; refresh: () => Promise<unknown>; logout: () => Promise<void> }
+// Sem valor padrão: ler a sessão fora do SessionProvider (ou numa cópia duplicada deste módulo no build)
+// precisa virar um erro visível, nunca uma sessão vazia silenciosa (que deixava a tela em branco).
+const Ctx = createContext<SessionCtx | null>(null)
 
 export function SessionProvider({ children }: { children: ReactNode }) {
   const qc = useQueryClient()
@@ -57,7 +55,11 @@ export function SessionProvider({ children }: { children: ReactNode }) {
   return <Ctx.Provider value={{ me: query.data ?? null, loading: query.isLoading, refresh: () => query.refetch(), logout }}>{children}</Ctx.Provider>
 }
 
-export const useSession = () => useContext(Ctx)
+export const useSession = (): SessionCtx => {
+  const v = useContext(Ctx)
+  if (!v) throw new Error('Sessão indisponível: componente fora do SessionProvider ou módulo de sessão duplicado no build.')
+  return v
+}
 export const useMe = () => {
   const { me } = useSession()
   if (!me) throw new Error('Sem sessão')

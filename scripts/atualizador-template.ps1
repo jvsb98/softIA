@@ -150,6 +150,16 @@ foreach ($ref in $refs) {
   if (Test-Path (P ('apps\web\dist' + ($ref -replace '/', '\')))) { Ok "Gerado: $ref" } else { Falha "index.html aponta para $ref, que não existe em apps\web\dist" }
 }
 if (-not ($html -match 'boot\.js')) { Falha 'index.html sem o vigia de carregamento (boot.js).' }
+# Módulos duplicados no pacote do painel: no Windows, o mesmo arquivo importado por caminhos diferentes
+# virava duas cópias (duas sessões) e o painel ficava em branco depois do login.
+$mainJs = Get-ChildItem (P 'apps\web\dist\assets') -Filter 'index-*.js' | Sort-Object Length -Descending | Select-Object -First 1
+if ($mainJs) {
+  $js = [IO.File]::ReadAllText($mainJs.FullName)
+  $copiasTema = ([regex]::Matches($js, 'na:theme')).Count
+  $copiasSessao = ([regex]::Matches($js, 'Sessão indisponível')).Count
+  if ($copiasTema -eq 1 -and $copiasSessao -eq 1) { Ok 'Pacote do painel sem módulos duplicados' }
+  else { Falha "Pacote do painel com módulos duplicados (tema: $copiasTema, sessão: $copiasSessao). O painel ficaria em branco depois do login." }
+}
 
 # ---------------------------------------------------------------- 5. servidor de teste
 Titulo 'Servidor de teste'

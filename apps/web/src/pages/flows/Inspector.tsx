@@ -1,7 +1,7 @@
 import { Plus, Trash2, X } from 'lucide-react'
 import type { ReactNode } from 'react'
-import { Button, cx, Field, IconButton, Input, Select, Switch, Textarea } from '@/components/ui'
-import { useSectors, useTags, useUsers } from '@/lib/queries'
+import { Button, cx, Field, IconButton, Input, Select, Switch, Textarea } from '../../components/ui'
+import { useSectors, useTags, useUsers } from '../../lib/queries'
 import { ICONS, CATEGORY_TONE } from './FlowNode'
 
 const OPS = [

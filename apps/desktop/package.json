@@ -1,7 +1,7 @@
 {
   "name": "nimber-atende-desktop",
   "productName": "Nimber Atende",
-  "version": "1.0.3",
+  "version": "1.0.4",
   "private": true,
   "description": "App desktop do Nimber Atende (Windows): abre o painel do servidor com notificações nativas, bandeja e início automático.",
   "author": "Nimber",

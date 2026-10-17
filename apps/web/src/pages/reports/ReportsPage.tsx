@@ -1,9 +1,9 @@
 import { useQuery } from '@tanstack/react-query'
 import { useEffect, useMemo, useState } from 'react'
-import { cx, PageHeader, Select, Spinner, Table } from '@/components/ui'
-import { api, qs } from '@/lib/api'
-import { LEAD_STATUS } from '@/lib/format'
-import { useConnections } from '@/lib/queries'
+import { cx, PageHeader, Select, Spinner, Table } from '../../components/ui'
+import { api, qs } from '../../lib/api'
+import { LEAD_STATUS } from '../../lib/format'
+import { useConnections } from '../../lib/queries'
 
 /*
  * Paleta categórica validada (scripts/validate_palette.js do método de dataviz):

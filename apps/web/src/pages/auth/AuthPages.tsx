@@ -2,9 +2,9 @@ import { useQuery } from '@tanstack/react-query'
 import { Check, Copy, ShieldCheck } from 'lucide-react'
 import { useEffect, useState, type FormEvent, type ReactNode } from 'react'
 import { toast } from 'sonner'
-import { Button, Field, Input, Logo, PixelGlyph, Spinner } from '@/components/ui'
-import { api } from '@/lib/api'
-import { useSession } from '@/lib/session'
+import { Button, Field, Input, Logo, PixelGlyph, Spinner } from '../../components/ui'
+import { api } from '../../lib/api'
+import { useSession } from '../../lib/session'
 
 /** Moldura das telas de acesso: painel à esquerda, campo de "frações" à direita. */
 function AuthFrame({ title, subtitle, children }: { title: string; subtitle?: ReactNode; children: ReactNode }) {

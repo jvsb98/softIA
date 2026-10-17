@@ -2,9 +2,9 @@ import { useQuery } from '@tanstack/react-query'
 import { Search } from 'lucide-react'
 import { useState } from 'react'
 import { Link } from 'react-router-dom'
-import { Avatar, Badge, Empty, PageHeader, Select, Table, TagChip } from '@/components/ui'
-import { api, qs } from '@/lib/api'
-import { ago, contactName, formatPhone, LEAD_STATUS } from '@/lib/format'
+import { Avatar, Badge, Empty, PageHeader, Select, Table, TagChip } from '../../components/ui'
+import { api, qs } from '../../lib/api'
+import { ago, contactName, formatPhone, LEAD_STATUS } from '../../lib/format'
 
 export function ContactsPage() {
   const [search, setSearch] = useState('')

@@ -2,9 +2,9 @@ import { useQueryClient } from '@tanstack/react-query'
 import { Plus, Trash2 } from 'lucide-react'
 import { useState } from 'react'
 import { toast } from 'sonner'
-import { Avatar, Badge, Button, cx, Dialog, Field, IconButton, Input, PageHeader, Select, Spinner, Switch, Textarea } from '@/components/ui'
-import { api } from '@/lib/api'
-import { useSectors, useUsers } from '@/lib/queries'
+import { Avatar, Badge, Button, cx, Dialog, Field, IconButton, Input, PageHeader, Select, Spinner, Switch, Textarea } from '../../components/ui'
+import { api } from '../../lib/api'
+import { useSectors, useUsers } from '../../lib/queries'
 
 const DAYS = ['Domingo', 'Segunda', 'Terça', 'Quarta', 'Quinta', 'Sexta', 'Sábado']
 const DIST: Record<string, { label: string; help: string }> = {

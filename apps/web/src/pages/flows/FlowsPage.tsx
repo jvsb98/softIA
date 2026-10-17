@@ -3,9 +3,9 @@ import { Archive, Copy, Plus, Workflow } from 'lucide-react'
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { toast } from 'sonner'
-import { Badge, Button, cx, Dialog, Empty, Field, IconButton, Input, PageHeader, PixelGlyph, Textarea } from '@/components/ui'
-import { api } from '@/lib/api'
-import { ago } from '@/lib/format'
+import { Badge, Button, cx, Dialog, Empty, Field, IconButton, Input, PageHeader, PixelGlyph, Textarea } from '../../components/ui'
+import { api } from '../../lib/api'
+import { ago } from '../../lib/format'
 
 export function FlowsPage() {
   const flows = useQuery({ queryKey: ['flows'], queryFn: () => api.get<any[]>('/api/flows') })

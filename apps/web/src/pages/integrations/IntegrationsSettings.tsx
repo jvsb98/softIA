@@ -2,9 +2,9 @@ import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { Copy, Database, Plus, Send, Trash2 } from 'lucide-react'
 import { useState } from 'react'
 import { toast } from 'sonner'
-import { Badge, Button, cx, Dialog, Empty, Field, IconButton, Input, PageHeader, Section, Select, Spinner, Switch, Table, Textarea } from '@/components/ui'
-import { api } from '@/lib/api'
-import { ago, dateTime } from '@/lib/format'
+import { Badge, Button, cx, Dialog, Empty, Field, IconButton, Input, PageHeader, Section, Select, Spinner, Switch, Table, Textarea } from '../../components/ui'
+import { api } from '../../lib/api'
+import { ago, dateTime } from '../../lib/format'
 import { useSettingForm } from '../settings/MiscSettings'
 
 const KIND: Record<string, { label: string; port: number }> = {

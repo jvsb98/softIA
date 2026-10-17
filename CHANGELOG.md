@@ -2,6 +2,16 @@
 
 Todas as mudanças relevantes do Nimber Atende. Formato baseado em [Keep a Changelog](https://keepachangelog.com/pt-BR/1.1.0/); versões seguem [SemVer](https://semver.org/lang/pt-BR/).
 
+## [1.0.4] — 2026-10-17
+
+### Corrigido
+- **Causa da tela em branco no Windows:** o painel importava os mesmos arquivos por dois caminhos (relativo `./lib/session` e apelido `@/lib/session`). No build feito no Windows, eles viravam duas cópias do mesmo módulo, com dois contextos de sessão: o painel tinha o login, a moldura (Shell) lia a cópia vazia e não mostrava nada, sem erro. Diagnosticado no navegador do usuário (Claude in Chrome). Todos os imports agora são relativos e o apelido `@/` foi removido do `tsconfig`.
+
+### Adicionado
+- A sessão lida fora do provedor (ou de uma cópia duplicada) agora gera um erro visível em vez de uma tela vazia.
+- O vigia de carregamento considera "painel vazio" quando só a área de notificações está montada.
+- O atualizador confere se o pacote do painel tem módulos duplicados.
+
 ## [1.0.3] — 2026-10-17
 
 ### Corrigido

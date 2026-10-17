@@ -43,9 +43,15 @@
   function root() {
     return document.getElementById('root')
   }
+  // Montado = existe algo além da área de notificações (que sempre aparece, mesmo com o painel vazio)
   function mounted() {
     var r = root()
-    return !!(r && r.childNodes.length > 0)
+    if (!r) return false
+    for (var i = 0; i < r.children.length; i++) {
+      var c = r.children[i]
+      if (!(c.tagName === 'SECTION' && /^Notifications/.test(c.getAttribute('aria-label') || ''))) return true
+    }
+    return false
   }
   function setFlag(v) {
     try {
@@ -185,10 +191,10 @@
     if (!r || !window.MutationObserver) return
     var timer = null
     new MutationObserver(function () {
-      if (r.childNodes.length === 0) {
+      if (!mounted()) {
         clearTimeout(timer)
         timer = setTimeout(function () {
-          if (r.childNodes.length === 0) show('O painel parou com um erro')
+          if (!mounted()) show('O painel parou com um erro')
         }, 1500)
       }
     }).observe(r, { childList: true })

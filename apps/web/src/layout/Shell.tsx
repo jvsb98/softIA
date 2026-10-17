@@ -3,11 +3,11 @@ import { LogOut, MessagesSquare, Monitor, Moon, Settings, Sun, Users, type Lucid
 import { useEffect, useRef, useState } from 'react'
 import { NavLink, Outlet, useNavigate } from 'react-router-dom'
 import { toast } from 'sonner'
-import { Avatar, cx, Logo } from '@/components/ui'
-import { api } from '@/lib/api'
-import { useSession } from '@/lib/session'
-import { getSocket } from '@/lib/socket'
-import { getThemePref, setThemePref, type ThemePref } from '@/lib/theme'
+import { Avatar, cx, Logo } from '../components/ui'
+import { api } from '../lib/api'
+import { useSession } from '../lib/session'
+import { getSocket } from '../lib/socket'
+import { getThemePref, setThemePref, type ThemePref } from '../lib/theme'
 import { extraNav } from './nav.extra'
 
 export interface NavItem {

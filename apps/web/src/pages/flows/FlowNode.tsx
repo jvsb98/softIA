@@ -22,7 +22,7 @@ import {
   type LucideIcon,
 } from 'lucide-react'
 import { memo } from 'react'
-import { cx } from '@/components/ui'
+import { cx } from '../../components/ui'
 
 export const ICONS: Record<string, LucideIcon> = {
   play: Play,

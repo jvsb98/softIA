@@ -1,8 +1,8 @@
 import { FastForward, RotateCcw, Send, X } from 'lucide-react'
 import { useEffect, useRef, useState } from 'react'
 import { toast } from 'sonner'
-import { Badge, Button, cx, IconButton } from '@/components/ui'
-import { api } from '@/lib/api'
+import { Badge, Button, cx, IconButton } from '../../components/ui'
+import { api } from '../../lib/api'
 import { WaText } from '../inbox/MessageItem'
 
 export interface SimView {
