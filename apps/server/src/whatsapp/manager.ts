@@ -104,6 +104,12 @@ class Manager {
   private async onStatus(id: string, s: { status: ConnStatus; qr?: string | null; error?: string | null; phone?: string | null; pushName?: string | null }) {
     await this.persistStatus(id, s.status, s.error ?? null, s.phone, s.pushName).catch(() => {})
     emitStaff('connection:status', { id, ...s })
+    if (s.status === 'logged_out' || s.status === 'error') {
+      const row = await one<any>(`SELECT name FROM connections WHERE id=$1`, [id]).catch(() => null)
+      void import('../ops/notifications.js').then((n) =>
+        n.notifyTeam(`conn:${id}:${s.status}`, `a conexão "${row?.name ?? id}" está ${s.status === 'logged_out' ? 'desconectada no celular (ler QR Code de novo)' : `com erro: ${s.error ?? ''}`}`, 'connection'),
+      )
+    }
     if (s.status === 'connected' || s.status === 'logged_out') {
       void import('../integrations/webhooks.js').then((w) => w.fireEvent(`connection.${s.status}`, { connectionId: id, phone: s.phone })).catch(() => {})
     }

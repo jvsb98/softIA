@@ -389,7 +389,45 @@ export function AgentSettings() {
           Salvar agente
         </Button>
       </Section>
+      <AllowedQueries value={f.allowedQueryIds} onChange={(v) => setF({ ...f, allowedQueryIds: v })} onSave={save} />
     </div>
+  )
+}
+
+function AllowedQueries({ value, onChange, onSave }: { value: string[]; onChange: (v: string[]) => void; onSave: () => void }) {
+  const queries = useQuery({ queryKey: ['saved-queries-lite'], queryFn: () => api.get<any[]>('/api/integrations/queries').catch(() => []) })
+  const list = (queries.data ?? []).filter((q) => q.ai_enabled && q.enabled)
+  return (
+    <Section
+      title="Consultas a outras bases"
+      description="Quais consultas este agente pode usar para responder com dados vivos. Consultas que exigem verificação só rodam depois que o contato confirmar a identidade."
+    >
+      {!list.length ? (
+        <p className="text-[13px] text-muted">Nenhuma consulta disponível. Cadastre em Configurações → Consultas a outras bases.</p>
+      ) : (
+        <div className="space-y-2">
+          {list.map((q) => (
+            <label key={q.id} className="flex items-start gap-2.5 rounded-[10px] border border-line p-3 text-[13px]">
+              <input
+                type="checkbox"
+                className="mt-0.5 accent-[var(--coral)]"
+                checked={value.includes(q.id)}
+                onChange={(e) => onChange(e.target.checked ? [...value, q.id] : value.filter((x) => x !== q.id))}
+              />
+              <span className="min-w-0">
+                <span className="font-medium text-ink">{q.label}</span>
+                {q.is_verification && <span className="ml-2 text-[12px] text-nimbus-ink">verificação de identidade</span>}
+                {q.requires_verification && <span className="ml-2 text-[12px] text-warn">exige verificação</span>}
+                <span className="block text-[12.5px] text-muted">{q.description}</span>
+              </span>
+            </label>
+          ))}
+          <Button variant="primary" className="mt-3" onClick={onSave}>
+            Salvar agente
+          </Button>
+        </div>
+      )}
+    </Section>
   )
 }
 

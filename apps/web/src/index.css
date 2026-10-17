@@ -36,6 +36,10 @@
   --bubble-out: #071832;
   --bubble-out-ink: #f6f1e7;
   --bubble-note: #fff3c4;
+  /* gráficos: paleta categórica validada (claro) */
+  --viz-1: #2a78d6;
+  --viz-2: #eb6834;
+  --viz-3: #1baf7a;
   --shadow: 0 1px 0 rgb(7 24 50 / 0.04), 0 8px 24px -12px rgb(7 24 50 / 0.18);
   color-scheme: light;
 }
@@ -62,6 +66,10 @@
   --bubble-out: #f6f1e7;
   --bubble-out-ink: #071832;
   --bubble-note: #3a3420;
+  /* gráficos: mesmas cores, degraus para fundo escuro */
+  --viz-1: #3987e5;
+  --viz-2: #d95926;
+  --viz-3: #199e70;
   --shadow: 0 1px 0 rgb(0 0 0 / 0.2), 0 10px 30px -12px rgb(0 0 0 / 0.6);
   color-scheme: dark;
 }

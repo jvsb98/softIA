@@ -313,6 +313,8 @@ export async function runAgentTurn(conv: ConversationRow, opts: TurnOptions): Pr
         )
         await logEvent(conv.id, 'compliance.blocked', { type: 'ai' }, { rule: RULE_LABEL[g.rule!], by: g.by })
         await audit({ action: 'compliance.blocked', entity: 'conversation', entityId: conv.id, data: { rule: g.rule, by: g.by, excerpt: g.excerpt } })
+        void import('../ops/notifications.js').then((n) => n.notifyTeam(`compliance:${conv.id}`, `o compliance bloqueou uma resposta da IA (${RULE_LABEL[g.rule!]}). Conversa transferida para humano.`, 'compliance'))
+        void import('../integrations/webhooks.js').then((w) => w.fireEvent('compliance.blocked', { conversationId: conv.id, rule: g.rule }))
       }
       return { kind: 'handoff', reason: `Compliance: a IA tentou responder com ${RULE_LABEL[g.rule!]}`, sectorId: null, priority: 2, text: 'Essa é uma ótima pergunta. Para te responder com precisão, vou chamar um especialista do nosso time, tudo bem? Ele continua por aqui em instantes.' }
     }
