@@ -1,5 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { Download, Pencil } from 'lucide-react'
+import { Download, Pencil, UserX } from 'lucide-react'
 import { useEffect, useState, type ReactNode } from 'react'
 import { toast } from 'sonner'
 import { Badge, Button, cx, IconButton, Input, Select, TagChip, Textarea } from '@/components/ui'
@@ -124,9 +124,28 @@ export function ContextPanel({ conversation }: { conversation: any }) {
           <p className="text-[12.5px] text-muted">Primeiro contato.</p>
         )}
         {me?.user.role !== 'agent' && contact?.id && (
-          <a href={`/api/contacts/${contact.id}/export`} className="mt-4 inline-flex items-center gap-1.5 text-[12px] text-muted hover:text-ink">
-            <Download className="size-3.5" /> Exportar dados do titular (LGPD)
-          </a>
+          <div className="mt-4 flex flex-col items-start gap-1.5">
+            <a href={`/api/contacts/${contact.id}/export`} className="inline-flex items-center gap-1.5 text-[12px] text-muted hover:text-ink">
+              <Download className="size-3.5" /> Exportar dados do titular (LGPD)
+            </a>
+            {me?.user.role === 'admin' && (
+              <button
+                className="inline-flex items-center gap-1.5 text-[12px] text-muted hover:text-coral-ink"
+                onClick={async () => {
+                  if (!confirm('Anonimizar este contato? Nome, telefone, e-mail, perfil e o texto das mensagens serão apagados de forma definitiva. Use quando o titular pedir a eliminação dos dados.')) return
+                  try {
+                    await api.post(`/api/contacts/${contact.id}/anonymize`)
+                    toast.success('Contato anonimizado.')
+                    qc.invalidateQueries()
+                  } catch (e: any) {
+                    toast.error(e.message)
+                  }
+                }}
+              >
+                <UserX className="size-3.5" /> Anonimizar titular (LGPD)
+              </button>
+            )}
+          </div>
         )}
       </div>
     </aside>

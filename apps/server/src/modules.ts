@@ -1,3 +1,4 @@
+import { APP_VERSION } from './lib/version.js'
 /**
  * Registro dos módulos do servidor (rotas, workers e ganchos).
  * Cada fase acrescenta seus módulos aqui.
@@ -22,7 +23,7 @@ import { registerFollowups } from './ops/followups.js'
 
 export async function registerModules(app: FastifyInstance, cfg: AppConfig) {
   const secure = cfg.server.publicUrl.startsWith('https://')
-  app.get('/api/health', async () => ({ ok: true, app: 'nimber-atende', version: process.env.npm_package_version ?? '1.0.0', time: new Date().toISOString() }))
+  app.get('/api/health', async () => ({ ok: true, app: 'nimber-atende', version: APP_VERSION, time: new Date().toISOString() }))
   await authRoutes(app, secure)
   await adminRoutes(app)
   await inboxRoutes(app)

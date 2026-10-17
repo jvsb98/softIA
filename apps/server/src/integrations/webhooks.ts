@@ -6,6 +6,7 @@ import { hmac } from '../lib/crypto.js'
 import { one, q } from '../lib/db.js'
 import { enqueue, work, type Job } from '../lib/jobs.js'
 import { log } from '../lib/logger.js'
+import { safeFetch } from '../lib/net-guard.js'
 
 export const WEBHOOK_EVENTS: Record<string, string> = {
   'lead.qualified': 'Lead qualificado (com score e respostas)',
@@ -68,7 +69,7 @@ async function deliver(job: Job<{ deliveryId: number }>) {
   const body = JSON.stringify(d.payload)
   let code: number | null = null
   try {
-    const res = await fetch(d.url, {
+    const res = await safeFetch(d.url, {
       method: 'POST',
       headers: { 'content-type': 'application/json', 'user-agent': 'NimberAtende-Webhook/1.0', 'x-nimber-event': d.event, 'x-nimber-signature': `sha256=${hmac(d.secret, body)}` },
       body,

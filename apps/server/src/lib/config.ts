@@ -119,7 +119,7 @@ function revealSecret(value: string, label: string): string {
 export const DATABASE_TEMPLATE = `# ==========================================================
 #  Nimber Atende — conexão com o banco de dados (PostgreSQL)
 # ==========================================================
-#  Edite os valores abaixo e reinicie o serviço "Nimber Atende Server".
+#  Edite os valores abaixo e reinicie o serviço "Nimber Atende".
 #  No Windows, a senha é protegida automaticamente (DPAPI) na primeira
 #  execução: a linha PASSWORD passa a começar com "dpapi:".
 #  Para trocar a senha, basta escrever a nova senha em texto puro.
@@ -156,14 +156,16 @@ LOG_LEVEL=info
 
 function loadDatabase(configDir: string): DatabaseConfig {
   const file = join(configDir, 'database.txt')
-  if (!existsSync(file)) {
+  // Em contêiner (Docker/DigitalOcean) a conexão pode vir só de variáveis de ambiente NIMBER_DB_*
+  const fromEnv = !!process.env.NIMBER_DB_HOST
+  if (!existsSync(file) && !fromEnv) {
     mkdirSync(configDir, { recursive: true })
     writeFileSync(file, DATABASE_TEMPLATE, 'utf8')
     throw new Error(
       `Arquivo de configuração criado em ${file}. Preencha os dados do PostgreSQL e inicie o serviço novamente.`,
     )
   }
-  let text = readFileSync(file, 'utf8')
+  let text = existsSync(file) ? readFileSync(file, 'utf8') : ''
   const kv = parseKeyValueFile(text)
   const env = process.env
   let password = env.NIMBER_DB_PASSWORD ?? kv.PASSWORD ?? ''
@@ -183,7 +185,9 @@ function loadDatabase(configDir: string): DatabaseConfig {
   const sslRaw = (env.NIMBER_DB_SSL ?? kv.SSL ?? 'false').toLowerCase()
   let sslCa: string | undefined
   const caPath = env.NIMBER_DB_SSL_CA ?? kv.SSL_CA
-  if (caPath) {
+  if (caPath?.includes('-----BEGIN')) {
+    sslCa = caPath.replace(/\\n/g, '\n') // certificado colado direto na variável de ambiente
+  } else if (caPath) {
     const p = resolve(configDir, caPath)
     if (existsSync(p)) sslCa = readFileSync(p, 'utf8')
   }

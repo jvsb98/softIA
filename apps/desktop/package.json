@@ -1,0 +1,59 @@
+{
+  "name": "nimber-atende-desktop",
+  "productName": "Nimber Atende",
+  "version": "1.0.0",
+  "private": true,
+  "description": "App desktop do Nimber Atende (Windows): abre o painel do servidor com notificações nativas, bandeja e início automático.",
+  "author": "Nimber",
+  "main": "src/main.js",
+  "scripts": {
+    "start": "electron .",
+    "check": "node --check src/main.js && node --check src/preload.js && node --check src/settings.js",
+    "dist": "electron-builder --win nsis --x64 --publish never",
+    "dist:dir": "electron-builder --win dir --x64 --publish never"
+  },
+  "devDependencies": {
+    "electron": "^44.8.0",
+    "electron-builder": "^26.15.3"
+  },
+  "build": {
+    "appId": "br.com.nimber.atende",
+    "productName": "Nimber Atende",
+    "copyright": "Nimber",
+    "directories": {
+      "output": "dist",
+      "buildResources": "build"
+    },
+    "files": [
+      "src/**/*",
+      "build/icon.png",
+      "build/tray.png",
+      "build/tray@2x.png",
+      "build/badge.png",
+      "build/badge@2x.png",
+      "package.json"
+    ],
+    "extraResources": [
+      {
+        "from": "server-url.txt",
+        "to": "server-url.txt",
+        "filter": ["**/*"]
+      }
+    ],
+    "win": {
+      "target": [{ "target": "nsis", "arch": ["x64"] }],
+      "icon": "build/icon.ico"
+    },
+    "nsis": {
+      "oneClick": false,
+      "perMachine": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true,
+      "shortcutName": "Nimber Atende",
+      "installerLanguages": ["pt_BR"],
+      "language": "1046",
+      "artifactName": "NimberAtende-Desktop-Setup-${version}.${ext}"
+    }
+  }
+}

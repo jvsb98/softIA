@@ -1,0 +1,13 @@
+**/node_modules
+**/dist
+out
+release
+data
+.git
+apps/desktop
+config/database.txt
+config/server.txt
+config/master.key
+config/*.crt
+deploy/docker/.env
+*.log

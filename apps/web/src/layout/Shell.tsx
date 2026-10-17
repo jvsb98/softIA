@@ -76,6 +76,7 @@ function useRealtimeBridge() {
           const n = new Notification(title, { body, icon: '/favicon.svg', tag: conversationId })
           n.onclick = () => {
             window.focus()
+            ;(window as any).nimberDesktop?.focus?.()
             if (conversationId) navigate(`/atendimento/${conversationId}`)
           }
         }

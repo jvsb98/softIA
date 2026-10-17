@@ -1,0 +1,88 @@
+# =====================================================================
+#  Nimber Atende — Docker Compose (DigitalOcean Droplet ou qualquer Linux)
+#
+#  1) cp .env.example .env   e preencha
+#  2) Com banco gerenciado da DigitalOcean (recomendado):
+#        docker compose --profile https up -d
+#     Com PostgreSQL no próprio servidor (contêiner):
+#        docker compose --profile local-db --profile https up -d
+#     Sem HTTPS (só testes na rede interna):
+#        docker compose --profile local-db up -d   → http://IP:8080
+#  Guia completo: docs/GUIA-DIGITALOCEAN.md
+# =====================================================================
+name: nimber-atende
+
+services:
+  app:
+    image: ${NIMBER_IMAGE:-ghcr.io/nimber/nimber-atende:latest}
+    build:
+      context: ../..
+      dockerfile: deploy/docker/Dockerfile
+    restart: unless-stopped
+    environment:
+      NIMBER_DB_HOST: ${NIMBER_DB_HOST:-db}
+      NIMBER_DB_PORT: ${NIMBER_DB_PORT:-5432}
+      NIMBER_DB_NAME: ${NIMBER_DB_NAME:-nimber_atende}
+      NIMBER_DB_USER: ${NIMBER_DB_USER:-nimber_atende}
+      NIMBER_DB_PASSWORD: ${NIMBER_DB_PASSWORD:?defina NIMBER_DB_PASSWORD no .env}
+      NIMBER_DB_SSL: ${NIMBER_DB_SSL:-false}
+      NIMBER_DB_SSL_CA: ${NIMBER_DB_SSL_CA:-}
+      NIMBER_MASTER_KEY: ${NIMBER_MASTER_KEY:-}
+      PUBLIC_URL: ${PUBLIC_URL:-http://localhost:8080}
+      TRUST_PROXY: ${TRUST_PROXY:-true}
+      LOG_LEVEL: ${LOG_LEVEL:-info}
+      TZ: America/Sao_Paulo
+    volumes:
+      - nimber_config:/config
+      - nimber_data:/data
+      # Banco gerenciado da DigitalOcean: baixe o "CA certificate" para esta pasta, descomente a linha
+      # abaixo e use NIMBER_DB_SSL=true e NIMBER_DB_SSL_CA=ca-certificate.crt no .env
+      # - ./ca-certificate.crt:/config/ca-certificate.crt:ro
+    ports:
+      # Com o perfil https o Caddy publica 80/443; esta porta fica só para acesso local/SSH
+      - "${APP_BIND:-127.0.0.1}:8080:8080"
+    depends_on:
+      db:
+        condition: service_healthy
+        required: false
+
+  db:
+    image: pgvector/pgvector:pg16
+    profiles: ["local-db"]
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${NIMBER_DB_NAME:-nimber_atende}
+      POSTGRES_USER: ${NIMBER_DB_USER:-nimber_atende}
+      POSTGRES_PASSWORD: ${NIMBER_DB_PASSWORD:?defina NIMBER_DB_PASSWORD no .env}
+      TZ: America/Sao_Paulo
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+
+  caddy:
+    image: caddy:2
+    profiles: ["https"]
+    restart: unless-stopped
+    environment:
+      DOMAIN: "${DOMAIN:?defina DOMAIN no .env, por exemplo atende.nimber.com.br}"
+    ports:
+      - "80:80"
+      - "443:443"
+      - "443:443/udp"
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    depends_on:
+      - app
+
+volumes:
+  nimber_config:
+  nimber_data:
+  pgdata:
+  caddy_data:
+  caddy_config:

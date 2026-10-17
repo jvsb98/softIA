@@ -5,6 +5,8 @@ release/
 .env
 config/database.txt
 config/master.key
+config/*.crt
+config/server.txt
 data/
 apps/web/dist/
 apps/desktop/dist/
@@ -13,3 +15,4 @@ deploy/windows/build/
 .DS_Store
 Thumbs.db
 apps/server/src/dev-simulate.ts
+out/

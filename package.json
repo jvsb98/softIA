@@ -15,7 +15,8 @@
     "test": "npm test -w apps/server",
     "migrate": "npm run migrate -w apps/server",
     "start": "npm start -w apps/server",
-    "postinstall": "patch-package"
+    "postinstall": "patch-package",
+    "package:server": "node scripts/package-server.mjs"
   },
   "engines": {
     "node": ">=22"

@@ -1,0 +1,34 @@
+<!--
+  Serviço do Windows do Nimber Atende (WinSW 2.x).
+  O instalador copia este arquivo para a pasta de instalação ao lado de NimberAtende.exe (WinSW renomeado).
+  Comandos úteis (PowerShell como administrador, na pasta de instalação):
+    .\NimberAtende.exe status | start | stop | restart
+-->
+<service>
+  <id>NimberAtende</id>
+  <name>Nimber Atende</name>
+  <description>Servidor do Nimber Atende: WhatsApp, IA, fluxos e painel web.</description>
+
+  <executable>%BASE%\node\node.exe</executable>
+  <arguments>--enable-source-maps "%BASE%\server\dist\index.js"</arguments>
+  <workingdirectory>%BASE%\server</workingdirectory>
+
+  <env name="NODE_ENV" value="production" />
+  <env name="NIMBER_CONFIG_DIR" value="%ProgramData%\NimberAtende\config" />
+
+  <startmode>Automatic</startmode>
+  <delayedAutoStart>true</delayedAutoStart>
+  <!-- PostgreSQL local, quando existir, sobe antes -->
+  <stoptimeout>25 sec</stoptimeout>
+
+  <onfailure action="restart" delay="10 sec" />
+  <onfailure action="restart" delay="30 sec" />
+  <onfailure action="restart" delay="2 min" />
+  <resetfailure>1 hour</resetfailure>
+
+  <logpath>%ProgramData%\NimberAtende\data\logs\servico</logpath>
+  <log mode="roll-by-size">
+    <sizeThreshold>10240</sizeThreshold>
+    <keepFiles>8</keepFiles>
+  </log>
+</service>

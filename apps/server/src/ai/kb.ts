@@ -6,6 +6,7 @@ import { capabilities, one, q } from '../lib/db.js'
 import { enqueue, every, work, type Job } from '../lib/jobs.js'
 import { log } from '../lib/logger.js'
 import { runEmbedding } from './router.js'
+import { safeFetch } from '../lib/net-guard.js'
 
 // ---------------------------------------------------------------- extração de texto
 
@@ -119,9 +120,7 @@ export async function indexDocument(documentId: string) {
 }
 
 async function fetchSite(url: string): Promise<string> {
-  const u = new URL(url)
-  if (!['http:', 'https:'].includes(u.protocol)) throw new Error('Endereço inválido')
-  const res = await fetch(url, { headers: { 'user-agent': 'NimberAtende/1.0 (+base de conhecimento)' }, signal: AbortSignal.timeout(20_000) })
+  const res = await safeFetch(url, { headers: { 'user-agent': 'NimberAtende/1.0 (+base de conhecimento)' }, signal: AbortSignal.timeout(20_000) })
   if (!res.ok) throw new Error(`Site respondeu ${res.status}`)
   const html = await res.text()
   const title = html.match(/<title[^>]*>([\s\S]*?)<\/title>/i)?.[1]?.trim()

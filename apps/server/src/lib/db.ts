@@ -33,7 +33,7 @@ export function createPool(cfg: DatabaseConfig): pg.Pool {
     idleTimeoutMillis: 30_000,
     connectionTimeoutMillis: 10_000,
   })
-  pool.on('error', (err) => log().error({ err }, 'Erro inesperado no pool do PostgreSQL'))
+  pool.on('error', (err) => log().error({ err: { message: err.message, code: (err as any).code } }, 'Erro inesperado no pool do PostgreSQL'))
   return pool
 }
 

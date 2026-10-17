@@ -1,0 +1,77 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  servidor-e-web:
+    name: Tipos, testes, build e smoke test
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: pgvector/pgvector:pg16
+        env:
+          POSTGRES_DB: nimber_atende
+          POSTGRES_USER: nimber_atende
+          POSTGRES_PASSWORD: ci-senha
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd "pg_isready -U nimber_atende"
+          --health-interval 5s --health-timeout 5s --health-retries 20
+    env:
+      NIMBER_DB_HOST: localhost
+      NIMBER_DB_PORT: "5432"
+      NIMBER_DB_NAME: nimber_atende
+      NIMBER_DB_USER: nimber_atende
+      NIMBER_DB_PASSWORD: ci-senha
+      NIMBER_CONFIG_DIR: ${{ runner.temp }}/nimber-config
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci --no-audit --no-fund
+      - name: Verificação de tipos (servidor e web)
+        run: npm run typecheck
+      - name: Testes unitários
+        run: npm test
+      - name: Build
+        run: npm run build
+      - name: Migrações num banco limpo
+        run: node apps/server/dist/cli.js migrate
+      - name: Migrações de novo (idempotência)
+        run: node apps/server/dist/cli.js migrate
+      - name: Smoke test do servidor
+        run: |
+          PORT=8080 node apps/server/dist/index.js > server.log 2>&1 &
+          for i in $(seq 1 30); do curl -sf http://localhost:8080/api/health && break; sleep 1; done
+          curl -sf http://localhost:8080/api/health | grep -q nimber-atende
+          curl -sf http://localhost:8080/ | grep -qi "<!doctype html"
+          curl -sf http://localhost:8080/api/setup/status | grep -q needsSetup
+          kill %1 || true
+      - name: Log do servidor (se falhar)
+        if: failure()
+        run: cat server.log || true
+
+  desktop:
+    name: App desktop (sintaxe)
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: apps/desktop
+    env:
+      ELECTRON_SKIP_BINARY_DOWNLOAD: "1"
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 22
+      - run: npm ci --ignore-scripts --no-audit --no-fund
+      - run: npm run check

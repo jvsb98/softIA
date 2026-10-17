@@ -1,0 +1,36 @@
+<!doctype html>
+<html lang="pt-BR">
+  <head>
+    <meta charset="UTF-8" />
+    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; style-src 'self'; script-src 'self'; font-src 'self'; img-src 'self' data:" />
+    <title>Nimber Atende — conectar ao servidor</title>
+    <link rel="stylesheet" href="pages.css" />
+  </head>
+  <body>
+    <aside class="field">
+      <canvas aria-hidden="true"></canvas>
+      <div class="brand">
+        <svg viewBox="0 0 32 32" aria-hidden="true"><g fill="#FE5A51"><rect x="7" y="7" width="6" height="6"/><rect x="19" y="7" width="6" height="6"/><rect x="13" y="13" width="6" height="6"/><rect x="7" y="19" width="6" height="6"/><rect x="19" y="19" width="6" height="6"/></g></svg>
+        Nimber Atende
+      </div>
+      <p>O app desktop abre o painel do servidor da Nimber, com notificações do Windows e o contador de conversas na barra de tarefas.</p>
+    </aside>
+    <main>
+      <form class="box" id="form" autocomplete="off">
+        <h1>Conectar ao servidor</h1>
+        <p class="lead">Informe o endereço que a TI passou. É o mesmo que você usaria no navegador.</p>
+        <label for="url">Endereço do servidor</label>
+        <input id="url" placeholder="http://servidor-nimber:8080" spellcheck="false" autofocus />
+        <div class="hint">Pode ser o nome do computador ou o IP, com a porta. Ex.: http://192.168.0.20:8080</div>
+        <div class="row">
+          <button type="button" id="test">Testar conexão</button>
+          <button type="submit" class="primary" id="save">Conectar</button>
+        </div>
+        <div class="msg" id="msg" role="status" aria-live="polite"></div>
+      </form>
+    </main>
+    <div class="ver" id="ver"></div>
+    <script src="field.js"></script>
+    <script src="setup.js"></script>
+  </body>
+</html>

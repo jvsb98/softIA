@@ -17,7 +17,7 @@ import {
 } from '../../auth/service.js'
 import bcrypt from 'bcryptjs'
 import { sha256 } from '../../lib/crypto.js'
-import { one, q } from '../../lib/db.js'
+import { one, q, tx } from '../../lib/db.js'
 import { audit } from '../../ops/audit.js'
 import { getSetting } from '../../ops/settings.js'
 import { badRequest, conflict, unauthorized } from '../errors.js'
@@ -35,14 +35,22 @@ export async function authRoutes(app: FastifyInstance, secureCookies: boolean) {
     const body = z
       .object({ name: z.string().min(2).max(120), email: z.string().email(), password: z.string().min(1), orgName: z.string().max(80).optional() })
       .parse(req.body)
-    const r = await one<{ n: number }>(`SELECT count(*) AS n FROM users`)
-    if ((r?.n ?? 0) > 0) throw conflict('O sistema já foi configurado.')
     const policy = await checkPasswordPolicy(body.password)
     if (policy) throw badRequest(policy)
-    const user = await one<any>(
-      `INSERT INTO users(name, email, password_hash, role, color) VALUES ($1,$2,$3,'admin','#FE5A51') RETURNING id`,
-      [body.name, body.email.toLowerCase(), await hashPassword(body.password)],
-    )
+    const hash = await hashPassword(body.password)
+    // Trava: duas requisições simultâneas não podem criar dois administradores iniciais
+    const user = await tx(async (c) => {
+      await c.query(`SELECT pg_advisory_xact_lock(7300001)`)
+      const n = (await c.query(`SELECT count(*)::int AS n FROM users`)).rows[0].n
+      if (n > 0) throw conflict('O sistema já foi configurado.')
+      return (
+        await c.query(`INSERT INTO users(name, email, password_hash, role, color) VALUES ($1,$2,$3,'admin','#FE5A51') RETURNING id`, [
+          body.name,
+          body.email.toLowerCase(),
+          hash,
+        ])
+      ).rows[0]
+    })
     if (body.orgName) await q(`UPDATE settings SET value = jsonb_set(value,'{name}',to_jsonb($1::text)) WHERE key='org'`, [body.orgName])
     // Admin entra no setor SDR por padrão (pode mudar depois)
     await q(`INSERT INTO sector_members(sector_id, user_id) SELECT id, $1 FROM sectors WHERE active ON CONFLICT DO NOTHING`, [user.id])

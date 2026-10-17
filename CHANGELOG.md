@@ -1,0 +1,44 @@
+# Changelog
+
+Todas as mudanças relevantes do Nimber Atende. Formato baseado em [Keep a Changelog](https://keepachangelog.com/pt-BR/1.1.0/); versões seguem [SemVer](https://semver.org/lang/pt-BR/).
+
+## [1.0.0] — 2026-10-16
+
+Primeira versão completa, construída em seis fases (cada uma é um commit e uma tag `fase-N` no histórico).
+
+### Fase 5 — Instalação e distribuição
+- Instalador do servidor para Windows (Inno Setup): pergunta os dados do PostgreSQL, protege a configuração, aplica migrações, instala o serviço "Nimber Atende" (WinSW, início automático e reinício em falha) e libera o firewall. Atualização por cima mantendo configuração.
+- App desktop (Electron) para os atendentes: tela de conexão ao servidor, bandeja, notificações nativas, contador de pendências na barra de tarefas, início com o Windows, tela de servidor indisponível com nova tentativa, endereço pré-configurável pela TI.
+- Imagem Docker e docker-compose para a DigitalOcean, com PostgreSQL opcional e HTTPS automático (Caddy). Configuração só por variáveis de ambiente.
+- GitHub Actions: CI (tipos, testes, build, migrações num banco limpo, smoke test), instaladores Windows em cada tag `v*` e imagem no GHCR.
+- Comando `backup` (pg_dump com rotação, usando a senha protegida do serviço).
+- Segurança: trava contra criação simultânea do primeiro administrador, redação de segredos nos logs, bloqueio de requisições ao serviço de metadados da nuvem (com checagem a cada redirecionamento).
+- Botão para anonimizar o titular (LGPD) no painel do contato.
+- Correção: a raiz `/` do painel respondia 403 quando acessada diretamente.
+- Documentação: README, guia para subir no GitHub, instalação no Windows, DigitalOcean, uso, segurança/LGPD e modelo de dados.
+
+### Fase 4 — Integrações e gestão
+- Consultas somente leitura a PostgreSQL, MySQL e SQL Server, usadas pela IA (ferramentas) e pelos fluxos (nó "Consultar base de dados"), com verificação de identidade, máscaras e auditoria.
+- Webhooks assinados com HMAC SHA-256, novas tentativas e registro de entregas.
+- Follow-ups automáticos só para quem interagiu, com opt-out por palavra-chave.
+- Alertas no Slack (conexão caída, bloqueio de compliance) e cadastro de feriados.
+- Relatórios: volume diário, automação, transferências e motivos, funil de leads, setores, atendentes, mapa de calor e uso da IA.
+
+### Fase 3 — Construtor de fluxos
+- Editor visual com 19 tipos de nó, rascunho e publicado, versões com restauração, validação antes de publicar, simulador e métricas por nó.
+- Modelos prontos: qualificação SDR, triagem de suporte, cadastro rápido.
+- Permissões: negócio edita fluxos; nós avançados (HTTP, código) só com permissão.
+
+### Fase 2 — Inteligência artificial
+- Provedores Anthropic, OpenAI, Gemini, compatíveis com OpenAI e simulado; modelo por tarefa com reserva automática e registro de consumo.
+- Agente com qualificação híbrida (critérios + score), base de conhecimento (documentos, FAQ, site) com busca por palavras e por significado, transcrição de áudio, sugestão de resposta e cartão de contexto na transferência.
+- Travas de compliance em três camadas e disclaimer automático (texto pendente de validação).
+
+### Fase 1 — Núcleo
+- Servidor Node.js com PostgreSQL, fila de tarefas própria e tempo real.
+- Conexão de WhatsApp por QR Code (Baileys com a correção de pareamento do Extrator de Integrantes), vários números, pausa da IA quando a equipe responde pelo celular, ritmo de envio humano.
+- Login com 2FA, papéis e auditoria; caixa de entrada multiatendente com filas por setor, distribuição, transferência, notas, respostas rápidas, etiquetas e mídia; horários por setor com mensagem fixa fora do horário.
+- Configuração do banco por `database.txt` com senha protegida por DPAPI no Windows.
+
+### Fase 0 — Arquitetura
+- Documento de arquitetura com as 18 decisões, modelo de dados, IA, compliance, segurança/LGPD, proteção do número e plano de implantação.

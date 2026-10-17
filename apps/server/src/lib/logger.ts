@@ -27,7 +27,19 @@ export function createLogger(level: string, dataDir?: string): Logger {
       /* sem permissão de escrita: só console */
     }
   }
-  root = pino({ level, base: { app: 'nimber-atende' }, timestamp: pino.stdTimeFunctions.isoTime }, pino.transport({ targets }))
+  root = pino(
+    {
+      level,
+      base: { app: 'nimber-atende' },
+      timestamp: pino.stdTimeFunctions.isoTime,
+      // Segredos nunca vão para o log, mesmo que algum objeto seja registrado por engano
+      redact: {
+        paths: ['password', '*.password', 'apiKey', '*.apiKey', 'secret', '*.secret', 'token', '*.token', 'headers.cookie', '*.headers.cookie', 'headers.authorization', '*.headers.authorization', 'err.client'],
+        censor: '[oculto]',
+      },
+    },
+    pino.transport({ targets }),
+  )
   return root
 }
 

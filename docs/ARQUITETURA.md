@@ -228,7 +228,7 @@ Como a conexão não é oficial, o sistema adota um **ritmo humano** por padrão
 
 | Ambiente | Como roda | Configuração |
 |---|---|---|
-| Testes (Windows) | Serviço "Nimber Atende Server" (WinSW) instalado pelo `NimberAtendeServer-Setup.exe` | `C:\ProgramData\NimberAtende\config\database.txt` |
+| Testes (Windows) | Serviço "Nimber Atende" (WinSW) instalado pelo `NimberAtendeServer-Setup-<versão>.exe` | `C:\ProgramData\NimberAtende\config\database.txt` |
 | Produção (DigitalOcean) | Droplet Ubuntu + Docker Compose + Caddy (HTTPS) | `/opt/nimber-atende/config/database.txt` |
 | Atendentes | Navegador ou `NimberAtende-Setup.exe` (app desktop) | Endereço do servidor na primeira abertura |
 

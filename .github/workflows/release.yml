@@ -1,0 +1,72 @@
+name: Release (instaladores Windows)
+
+# Dispara ao criar uma tag de versão:  git tag v1.0.0 && git push origin v1.0.0
+# Também pode ser rodado manualmente em Actions → "Release" → Run workflow (gera só os artefatos).
+on:
+  push:
+    tags: ["v*"]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  servidor:
+    name: Instalador do servidor (Windows)
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 22
+          cache: npm
+      - name: Gerar NimberAtendeServer-Setup.exe
+        shell: pwsh
+        run: ./deploy/windows/build-windows.ps1
+      - uses: actions/upload-artifact@v4
+        with:
+          name: servidor-windows
+          path: |
+            release/NimberAtendeServer-Setup-*.exe
+            release/NimberAtendeServer-Setup-*.exe.sha256
+          if-no-files-found: error
+
+  desktop:
+    name: App desktop (Windows)
+    runs-on: windows-latest
+    defaults:
+      run:
+        working-directory: apps/desktop
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: apps/desktop/package-lock.json
+      - run: npm ci --no-audit --no-fund
+      - name: Gerar NimberAtende-Desktop-Setup.exe
+        run: npm run dist
+        env:
+          CSC_IDENTITY_AUTO_DISCOVERY: "false"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: desktop-windows
+          path: apps/desktop/dist/NimberAtende-Desktop-Setup-*.exe
+          if-no-files-found: error
+
+  publicar:
+    name: Publicar release no GitHub
+    if: startsWith(github.ref, 'refs/tags/v')
+    needs: [servidor, desktop]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/download-artifact@v5
+        with:
+          path: artefatos
+          merge-multiple: true
+      - uses: softprops/action-gh-release@v2
+        with:
+          name: Nimber Atende ${{ github.ref_name }}
+          generate_release_notes: true
+          files: artefatos/*

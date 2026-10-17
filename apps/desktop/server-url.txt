@@ -1,0 +1,4 @@
+# Endereço padrão do servidor embutido no instalador do app desktop.
+# Para distribuir o app já apontando para o servidor da Nimber, escreva o endereço
+# na linha abaixo (sem o #) ANTES de gerar o instalador. Exemplo:
+# http://atendimento.nimber.local:8080

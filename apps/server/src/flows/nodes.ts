@@ -4,6 +4,7 @@
  */
 import vm from 'node:vm'
 import type { NodeContext, NodeResult, NodeType } from './types.js'
+import { safeFetch } from '../lib/net-guard.js'
 
 const norm = (s: string) =>
   s
@@ -537,7 +538,7 @@ export const NODE_TYPES: NodeType[] = [
       const body = method === 'GET' || method === 'DELETE' ? undefined : await ctx.interpolate(String(d.body ?? ''), true)
       if (ctx.io.sim && !url.startsWith('http')) return { next: 'error' }
       try {
-        const res = await fetch(url, { method, headers, body: body || undefined, signal: AbortSignal.timeout(Number(d.timeoutMs ?? 10000)) })
+        const res = await safeFetch(url, { method, headers, body: body || undefined, signal: AbortSignal.timeout(Number(d.timeoutMs ?? 10000)) })
         const text = await res.text()
         let data: any = text
         try {

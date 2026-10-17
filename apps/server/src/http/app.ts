@@ -147,6 +147,8 @@ export async function buildApp(cfg: AppConfig): Promise<FastifyInstance> {
 
   if (webDist) {
     await app.register(fstatic, { root: webDist, prefix: '/', wildcard: true, maxAge: '1h', index: false })
+    // A raiz é uma pasta: sem esta rota o plugin responde 403 em "/"
+    app.get('/', (_req, reply) => reply.header('Cache-Control', 'no-cache').sendFile('index.html'))
     app.setNotFoundHandler((req, reply) => {
       if (req.url.startsWith('/api/') || req.url.startsWith('/socket.io')) return reply.status(404).send({ error: 'Rota não encontrada' })
       return reply.header('Cache-Control', 'no-cache').sendFile('index.html')
