@@ -114,9 +114,13 @@ export async function migrate(): Promise<{ applied: string[] }> {
   await tryExtension('pgcrypto')
 
   // Função de normalização usada na busca textual (com ou sem unaccent).
+  // O unaccent pode estar em "public" ou no schema próprio (SCHEMA= no database.txt): usa onde ele estiver.
+  const ua = capabilities.unaccent
+    ? await one<{ ns: string }>(`SELECT quote_ident(n.nspname) AS ns FROM pg_extension e JOIN pg_namespace n ON n.oid = e.extnamespace WHERE e.extname = 'unaccent'`)
+    : null
   await db().query(
-    capabilities.unaccent
-      ? `CREATE OR REPLACE FUNCTION na_norm(t text) RETURNS text LANGUAGE sql IMMUTABLE PARALLEL SAFE AS $$ SELECT lower(public.unaccent('public.unaccent'::regdictionary, coalesce(t,''))) $$`
+    ua
+      ? `CREATE OR REPLACE FUNCTION na_norm(t text) RETURNS text LANGUAGE sql IMMUTABLE PARALLEL SAFE AS $$ SELECT lower(${ua.ns}.unaccent('${ua.ns}.unaccent'::regdictionary, coalesce(t,''))) $$`
       : `CREATE OR REPLACE FUNCTION na_norm(t text) RETURNS text LANGUAGE sql IMMUTABLE PARALLEL SAFE AS $$ SELECT lower(coalesce(t,'')) $$`,
   )
 

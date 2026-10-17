@@ -45,6 +45,23 @@ A base de conhecimento busca por palavras sempre. Com a extensão **pgvector**, 
 
 Se o PostgreSQL estiver em outro servidor, libere o acesso do servidor do Nimber Atende em `pg_hba.conf` (ex.: `host nimber_atende nimber_atende 192.168.0.30/32 scram-sha-256`), confira `listen_addresses` em `postgresql.conf` e a porta 5432 no firewall daquela máquina.
 
+### 2.5 Já existe um PostgreSQL com outros bancos
+
+Não instale outro PostgreSQL. Use o servidor existente de uma destas formas:
+
+- **Banco próprio (recomendado):** rode só os comandos do item 2.2 nesse servidor, conectado com um usuário administrador. Os bancos são isolados entre si.
+- **Dentro de um banco que já existe:** crie um schema só para o Nimber Atende e aponte o `database.txt` para ele. Como administrador, dentro desse banco:
+
+  ```sql
+  CREATE ROLE nimber_atende LOGIN PASSWORD 'troque-por-uma-senha-longa';
+  CREATE SCHEMA nimber_atende AUTHORIZATION nimber_atende;
+  GRANT CONNECT ON DATABASE nome_do_banco_existente TO nimber_atende;
+  CREATE EXTENSION IF NOT EXISTS unaccent SCHEMA public;
+  CREATE EXTENSION IF NOT EXISTS pg_trgm SCHEMA public;
+  ```
+
+  No `database.txt`: `DATABASE=nome_do_banco_existente` e `SCHEMA=nimber_atende`. As 37 tabelas ficam todas nesse schema, sem tocar nas tabelas do outro sistema.
+
 ## 3. Rodar o instalador
 
 1. Clique com o botão direito em `NimberAtendeServer-Setup-<versão>.exe` → **Executar como administrador**.

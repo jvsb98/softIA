@@ -201,7 +201,7 @@ function loadDatabase(configDir: string): DatabaseConfig {
     ssl: sslRaw === 'true' ? true : sslRaw === 'no-verify' ? 'no-verify' : false,
     sslCa,
     poolMax: Number(kv.POOL_MAX ?? 15),
-    schema: kv.SCHEMA ?? 'public',
+    schema: env.NIMBER_DB_SCHEMA ?? kv.SCHEMA ?? 'public',
   }
 }
 

@@ -2,6 +2,14 @@
 
 Todas as mudanças relevantes do Nimber Atende. Formato baseado em [Keep a Changelog](https://keepachangelog.com/pt-BR/1.1.0/); versões seguem [SemVer](https://semver.org/lang/pt-BR/).
 
+## [1.0.1] — 2026-10-16
+
+### Corrigido
+- Instalação num banco já existente com schema próprio (`SCHEMA=` no `database.txt`): quando as extensões ainda não existiam, elas eram criadas nesse schema e a migração falhava ao montar a busca sem acento. A função de busca agora usa o schema onde o `unaccent` estiver.
+
+### Adicionado
+- Variável de ambiente `NIMBER_DB_SCHEMA` (Docker), equivalente ao `SCHEMA=` do `database.txt`.
+
 ## [1.0.0] — 2026-10-16
 
 Primeira versão completa, construída em seis fases (cada uma é um commit e uma tag `fase-N` no histórico).

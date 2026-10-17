@@ -1,7 +1,7 @@
 {
   "name": "nimber-atende-desktop",
   "productName": "Nimber Atende",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "private": true,
   "description": "App desktop do Nimber Atende (Windows): abre o painel do servidor com notificações nativas, bandeja e início automático.",
   "author": "Nimber",
@@ -37,11 +37,20 @@
       {
         "from": "server-url.txt",
         "to": "server-url.txt",
-        "filter": ["**/*"]
+        "filter": [
+          "**/*"
+        ]
       }
     ],
     "win": {
-      "target": [{ "target": "nsis", "arch": ["x64"] }],
+      "target": [
+        {
+          "target": "nsis",
+          "arch": [
+            "x64"
+          ]
+        }
+      ],
       "icon": "build/icon.ico"
     },
     "nsis": {
@@ -51,7 +60,9 @@
       "createDesktopShortcut": true,
       "createStartMenuShortcut": true,
       "shortcutName": "Nimber Atende",
-      "installerLanguages": ["pt_BR"],
+      "installerLanguages": [
+        "pt_BR"
+      ],
       "language": "1046",
       "artifactName": "NimberAtende-Desktop-Setup-${version}.${ext}"
     }
