@@ -121,9 +121,9 @@ function revealSecret(value: string, label: string): string {
 // ---------------------------------------------------------------- database.txt
 
 export const DATABASE_TEMPLATE = `# ==========================================================
-#  Nimber Atende — conexão com o banco de dados (PostgreSQL)
+#  softIA — conexão com o banco de dados (PostgreSQL)
 # ==========================================================
-#  Edite os valores abaixo e reinicie o serviço "Nimber Atende".
+#  Edite os valores abaixo e reinicie o serviço.
 #  No Windows, a senha é protegida automaticamente (DPAPI) na primeira
 #  execução: a linha PASSWORD passa a começar com "dpapi:".
 #  Para trocar a senha, basta escrever a nova senha em texto puro.
@@ -145,7 +145,7 @@ SCHEMA=public
 `
 
 export const SERVER_TEMPLATE = `# ==========================================================
-#  Nimber Atende — opções do servidor (opcional)
+#  softIA — opções do servidor (opcional)
 # ==========================================================
 PORT=8080
 # Endereço de escuta: 0.0.0.0 aceita acessos da rede; 127.0.0.1 só desta máquina

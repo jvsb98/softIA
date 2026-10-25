@@ -98,7 +98,7 @@ export async function authRoutes(app: FastifyInstance, secureCookies: boolean) {
     const u = currentUser(req)
     const sec = await getSetting('security', { require2faAdmins: true, require2faAll: false })
     const mustHave2fa = sec.require2faAll || (sec.require2faAdmins && u.role === 'admin')
-    const org = await getSetting('org', { name: 'Nimber' })
+    const org = await getSetting('org', { name: '' })
     return {
       user: { ...u, permissions: effectivePermissions(u.role, u.permissions) },
       mfaSetupRequired: mustHave2fa && !u.totp_enabled,

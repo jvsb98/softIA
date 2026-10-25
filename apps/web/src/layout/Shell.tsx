@@ -196,7 +196,7 @@ export function Shell() {
   const counts = useQuery({ queryKey: ['counts'], queryFn: () => api.get<any>('/api/conversations/counts'), refetchInterval: 30_000 })
   const badge = Number(counts.data?.mine_unread ?? 0) + Number(counts.data?.queue ?? 0)
   useEffect(() => {
-    document.title = badge > 0 ? `(${badge}) Nimber Atende` : 'Nimber Atende'
+    document.title = badge > 0 ? `(${badge}) softIA` : 'softIA'
     ;(window as any).nimberDesktop?.setBadge?.(badge)
   }, [badge])
   if (!me) return null
@@ -207,7 +207,7 @@ export function Shell() {
     <div className="flex h-full">
       <aside className="flex w-[64px] shrink-0 flex-col items-center justify-between border-r border-line bg-panel py-4">
         <div className="flex flex-col items-center gap-5">
-          <NavLink to="/atendimento" aria-label="Nimber Atende — início">
+          <NavLink to="/atendimento" aria-label="Início">
             <Logo compact />
           </NavLink>
           <nav className="flex flex-col gap-1.5">

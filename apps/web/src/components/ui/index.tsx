@@ -180,7 +180,7 @@ export function Empty({ title, children, action, glyph }: { title: string; child
 }
 
 /**
- * Glifos em pixel, na linguagem da iconografia Nimber (grade 5×5).
+ * Glifos em pixel, em grade 5×5.
  * Usados em estados vazios e na marca — os ícones de interface continuam sendo de traço (Lucide).
  */
 const PIXEL: Record<string, string[]> = {
@@ -208,7 +208,7 @@ export function Logo({ compact }: { compact?: boolean }) {
       <PixelGlyph pattern="mark" size={compact ? 22 : 20} className="text-coral" />
       {!compact && (
         <span className="leading-none">
-          <span className="font-semibold tracking-tight">Nimber</span> <span className="text-muted">Atende</span>
+          <span className="font-semibold tracking-tight">soft</span><span className="text-muted">IA</span>
         </span>
       )}
     </span>

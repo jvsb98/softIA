@@ -120,7 +120,7 @@ export async function indexDocument(documentId: string) {
 }
 
 async function fetchSite(url: string): Promise<string> {
-  const res = await safeFetch(url, { headers: { 'user-agent': 'NimberAtende/1.0 (+base de conhecimento)' }, signal: AbortSignal.timeout(20_000) })
+  const res = await safeFetch(url, { headers: { 'user-agent': 'Mozilla/5.0 (compatible; KnowledgeBot/1.0)' }, signal: AbortSignal.timeout(20_000) })
   if (!res.ok) throw new Error(`Site respondeu ${res.status}`)
   const html = await res.text()
   const title = html.match(/<title[^>]*>([\s\S]*?)<\/title>/i)?.[1]?.trim()

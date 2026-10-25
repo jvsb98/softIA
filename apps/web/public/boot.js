@@ -1,5 +1,5 @@
 /*
- * Nimber Atende — vigia de carregamento.
+ * softIA — vigia de carregamento.
  *
  * Roda antes do painel (script comum, sem módulo) para que qualquer falha de carregamento apareça
  * na tela com o motivo, em vez de uma página em branco:

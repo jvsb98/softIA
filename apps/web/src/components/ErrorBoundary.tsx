@@ -24,7 +24,7 @@ export class ErrorBoundary extends Component<{ children: ReactNode }, { error: E
   }
 
   componentDidCatch(error: Error, info: ErrorInfo) {
-    console.error('[Nimber Atende] Erro na tela:', error, info.componentStack)
+    console.error('[softIA] Erro na tela:', error, info.componentStack)
     this.setState({ stack: (info.componentStack ?? '').trim().split('\n').slice(0, 6).join('\n') })
     if (isDomConflict(error)) {
       let last = 0

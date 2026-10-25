@@ -135,7 +135,7 @@ export function ConnectionsSettings() {
       <div className="mt-6 rounded-[12px] border border-line bg-panel-2/50 p-5 text-[13px] leading-relaxed text-ink-2">
         <div className="mb-1 font-semibold text-ink">Para proteger o número</div>
         Esta conexão usa o protocolo do WhatsApp Web (não é a API oficial). O sistema envia com ritmo humano — "digitando…", intervalos e limite por minuto — e não faz disparos em massa.
-        Mesmo assim, evite iniciar muitas conversas novas em sequência com pessoas que nunca falaram com a Nimber.
+        Mesmo assim, evite iniciar muitas conversas novas em sequência com pessoas que nunca falaram com a empresa.
       </div>
 
       <PairDialog conn={pairingLive} onClose={() => setPairing(null)} />

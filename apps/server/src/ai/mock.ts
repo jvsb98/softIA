@@ -78,7 +78,7 @@ export async function mockChat(r: ChatRequest): Promise<ChatResult> {
         resumo: `Contato conversou com o assistente (${lines.length} mensagens). Última fala: "${text.slice(0, 120)}".`,
         interesse: 'Ver histórico da conversa',
         pontos_de_atencao: [],
-        sugestao_resposta: 'Olá! Aqui é do time da Nimber, vou dar continuidade ao seu atendimento. Como posso te ajudar?',
+        sugestao_resposta: 'Olá! Aqui é do nosso time, vou dar continuidade ao seu atendimento. Como posso te ajudar?',
       }),
       toolCalls,
       usage,
@@ -102,9 +102,9 @@ export async function mockChat(r: ChatRequest): Promise<ChatResult> {
   const snippet = /\?|como|quanto|qual|o que|funciona|explica/.test(norm(text)) ? kbSnippet(r.system) : null
   const firstTurn = r.messages.filter((m) => m.role === 'assistant').length === 0
   const parts: string[] = []
-  if (firstTurn) parts.push('Olá! Sou o assistente virtual da Nimber.')
+  if (firstTurn) parts.push('Olá! Sou o assistente virtual.')
   if (snippet) parts.push(snippet)
-  else if (!firstTurn && !next) parts.push('Obrigado pelas informações! Posso te ajudar com mais alguma dúvida sobre a Nimber?')
+  else if (!firstTurn && !next) parts.push('Obrigado pelas informações! Posso te ajudar com mais alguma dúvida?')
   if (next) parts.push(next)
   else if (firstTurn && !snippet) parts.push('Como posso te ajudar hoje?')
   return { text: parts.join('\n\n'), toolCalls, usage }

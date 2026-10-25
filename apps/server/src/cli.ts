@@ -75,7 +75,7 @@ function findPgDump(explicit?: string): string {
  */
 async function backup(args: string[]) {
   const out = flag(args, 'out')
-  if (!out) throw new Error('Informe a pasta: backup --out D:\\Backups\\NimberAtende [--keep 14]')
+  if (!out) throw new Error('Informe a pasta: backup --out /opt/softia/backups [--keep 14]')
   const keep = Number(flag(args, 'keep') ?? 14)
   const cfg = loadConfig()
   const db = cfg.database

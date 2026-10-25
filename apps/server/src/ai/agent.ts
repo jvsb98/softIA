@@ -65,14 +65,14 @@ interface Triage {
   opt_out?: boolean
 }
 
-const TRIAGE_SYSTEM = `Você classifica a ÚLTIMA mensagem de um contato que fala com o WhatsApp da Nimber (plataforma de investimento em imóveis tokenizados).
+const TRIAGE_SYSTEM = `Você classifica a ÚLTIMA mensagem de um contato que fala com o WhatsApp de uma empresa.
 Responda SOMENTE com JSON:
-{"intent": "duvida|interesse_investir|suporte_cliente|falar_com_humano|assunto_sensivel|saudacao|conversa|outro",
+{"intent": "duvida|interesse_comprar|suporte_cliente|falar_com_humano|assunto_sensivel|saudacao|conversa|outro",
  "wants_human": boolean,            // pede explicitamente para falar com uma pessoa/atendente/especialista
- "sensitive": boolean,              // resgate, saque, problema com investimento, reclamação, Procon, advogado, processo, fraude
+ "sensitive": boolean,              // reclamação formal, Procon, advogado, processo, fraude, cobrança indevida, assunto de saúde delicado
  "sensitive_topic": string|null,
  "frustration": boolean,            // irritação, xingamento, reclamação de demora, frustração clara
- "existing_customer_account_issue": boolean, // já é investidor e o assunto é a conta dele (acesso, extrato, rendimentos, tokens)
+ "existing_customer_account_issue": boolean, // já é cliente e o assunto é um pedido, serviço ou pagamento dele
  "opt_out": boolean}                // pede para não receber mais mensagens ("parar", "sair", "não quero mais")`
 
 // ---------------------------------------------------------------- utilidades
@@ -129,23 +129,22 @@ ${ctx.extra ? `\n# Objetivo desta etapa\n${ctx.extra}\n` : ''}
 # Instruções
 ${agent.instructions}
 
-# Regras de compliance (inegociáveis)
-- NUNCA prometa, garanta ou projete rentabilidade, retorno ou valorização. Se perguntarem, informe apenas números oficialmente publicados na oferta que estejam no CONHECIMENTO, sempre como estimativa e lembrando que rentabilidade passada ou projetada não garante resultado futuro.
-- NUNCA diga que um investimento é "sem risco" ou "garantido".
-- NUNCA faça recomendação personalizada ("para o seu perfil, invista em X", "coloque Y reais"). Explique como funciona e ofereça um especialista.
-- NUNCA dê orientação jurídica ou tributária (impostos, declaração, direitos). Diga que um especialista pode orientar e transfira se a pessoa insistir.
+# Regras (inegociáveis)
+- NUNCA invente preços, prazos, condições ou disponibilidade. Informe apenas o que estiver no CONHECIMENTO; o resto, confirme com o time.
+- NUNCA prometa resultado de serviço, garantia ou desconto que não esteja no CONHECIMENTO.
+- NUNCA dê diagnóstico, orientação médica, jurídica ou tributária. Diga que um profissional pode orientar e transfira se a pessoa insistir.
 - Nunca invente informações que não estejam no CONHECIMENTO. Se não souber, use a ferramenta transferir_para_humano com motivo "sem_resposta".
 - Nunca peça senha, código de verificação ou dados bancários.
 
 # Contato
-Nome: ${ctx.contact?.name || ctx.contact?.push_name || 'desconhecido'}${ctx.contact?.is_customer ? ' (já é investidor da Nimber)' : ''}
-${ctx.profileLines.length ? `Já sabemos: ${ctx.profileLines.join('; ')}` : 'Ainda não sabemos nada sobre o perfil de investimento.'}
+Nome: ${ctx.contact?.name || ctx.contact?.push_name || 'desconhecido'}${ctx.contact?.is_customer ? ' (já é cliente)' : ''}
+${ctx.profileLines.length ? `Já sabemos: ${ctx.profileLines.join('; ')}` : 'Ainda não sabemos nada sobre o que o contato precisa.'}
 ${ctx.pending.length ? `Critérios ainda não respondidos (pergunte UM por vez, de forma natural, quando fizer sentido):\n${ctx.pending.map((c) => `- ${c.label}: ex. "${c.question}"`).join('\n')}` : 'Todos os critérios de qualificação já foram respondidos.'}
 
 # Setores para transferência
 ${ctx.sectors.map((s) => `- ${s.slug}: ${s.name}${s.description ? ` — ${s.description}` : ''}`).join('\n')}
 
-# CONHECIMENTO (use apenas isto para responder sobre a Nimber e as ofertas)
+# CONHECIMENTO (use apenas isto para responder sobre a empresa e seus serviços)
 ${ctx.kb}
 
 Data de hoje: ${today}.
@@ -390,12 +389,12 @@ export async function handoffNow(conv: ConversationRow, sectorId: string | null,
 
 // ---------------------------------------------------------------- cartão de contexto (resumo para o humano)
 
-const SUMMARY_SYSTEM = `Você prepara um cartão de contexto para o atendente humano que vai assumir uma conversa de WhatsApp da Nimber (investimentos em imóveis tokenizados).
+const SUMMARY_SYSTEM = `Você prepara um cartão de contexto para o atendente humano que vai assumir uma conversa de WhatsApp de uma empresa.
 Responda SOMENTE com JSON:
 {"resumo": "2 a 3 frases: quem é, o que quer, em que ponto parou",
  "interesse": "produto/assunto principal",
  "pontos_de_atencao": ["até 3 itens: objeções, urgência, sensibilidades"],
- "sugestao_resposta": "primeira mensagem sugerida para o atendente enviar, cordial e objetiva, sem promessas de rentabilidade"}`
+ "sugestao_resposta": "primeira mensagem sugerida para o atendente enviar, cordial e objetiva, sem prometer preço ou prazo"}`
 
 export async function buildHandoffCard(conversationId: string, reason: string) {
   const conv = await one<any>(`SELECT * FROM conversations WHERE id=$1`, [conversationId])
@@ -404,7 +403,7 @@ export async function buildHandoffCard(conversationId: string, reason: string) {
   const history = await loadHistory(conversationId, 30)
   let card: any = null
   try {
-    const transcript = history.map((m) => `${m.role === 'user' ? 'Contato' : 'Nimber'}: ${m.content}`).join('\n')
+    const transcript = history.map((m) => `${m.role === 'user' ? 'Contato' : 'Empresa'}: ${m.content}`).join('\n')
     const r = await runChat('summary', { system: SUMMARY_SYSTEM, messages: [{ role: 'user', content: `Motivo da transferência: ${reason}\n\nConversa:\n${transcript}` }], json: true, timeoutMs: 30_000 }, conversationId)
     card = parseJsonLoose(r.text)
   } catch {
@@ -436,7 +435,7 @@ export async function suggestReply(conversationId: string): Promise<{ text: stri
   const r = await runChat(
     'summary',
     {
-      system: `Você ajuda um atendente humano da Nimber (investimentos em imóveis tokenizados) a responder no WhatsApp. Escreva APENAS a próxima mensagem do atendente, em português, curta e cordial, usando somente informações do CONHECIMENTO. Nunca prometa rentabilidade, não faça recomendação personalizada nem dê orientação jurídica/tributária.\n\n${formatKbContext(hits)}`,
+      system: `Você ajuda um atendente humano a responder no WhatsApp. Escreva APENAS a próxima mensagem do atendente, em português, curta e cordial, usando somente informações do CONHECIMENTO. Não invente preço, prazo ou condição e não dê orientação médica, jurídica ou tributária.\n\n${formatKbContext(hits)}`,
       messages: history.length ? history : [{ role: 'user', content: 'Olá' }],
       timeoutMs: 30_000,
       mockHint: 'agent',

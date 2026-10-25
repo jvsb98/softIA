@@ -415,9 +415,9 @@ export function WebhooksSettings() {
     <div className="space-y-6">
       <PageHeader
         title="Webhooks"
-        description="Avise o n8n, o CRM da intranet ou outro sistema quando um lead for qualificado, uma conversa for transferida ou encerrada. Cada envio é assinado (cabeçalho X-Nimber-Signature: sha256=HMAC do corpo)."
+        description="Avise o n8n, um CRM ou outro sistema quando um lead for qualificado, uma conversa for transferida ou encerrada. Cada envio é assinado (cabeçalho X-Webhook-Signature: sha256=HMAC do corpo)."
         actions={
-          <Button variant="primary" icon={<Plus className="size-4" />} onClick={() => setEdit({ name: '', url: 'https://n8n.nimber.com.br/webhook/', events: ['lead.qualified'], enabled: true })}>
+          <Button variant="primary" icon={<Plus className="size-4" />} onClick={() => setEdit({ name: '', url: 'https://', events: ['lead.qualified'], enabled: true })}>
             Novo webhook
           </Button>
         }
@@ -596,7 +596,7 @@ export function FollowupsSettings() {
   const setAttempt = (i: number, patch: any) => s.setValue({ ...v, attempts: v.attempts.map((a, j) => (j === i ? { ...a, ...patch } : a)) })
   return (
     <div className="space-y-6">
-      <PageHeader title="Follow-ups automáticos" description="Retoma conversas paradas — só com quem já falou com a Nimber. Para na hora se o contato responder ou pedir para parar." />
+      <PageHeader title="Follow-ups automáticos" description="Retoma conversas paradas — só com quem já falou com a empresa. Para na hora se o contato responder ou pedir para parar." />
       <Section title="Regras">
         <div className="space-y-4">
           <Switch checked={v.enabled} onChange={(x) => s.setValue({ ...v, enabled: x })} label="Enviar follow-ups" />

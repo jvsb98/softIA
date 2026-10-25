@@ -56,13 +56,13 @@ export function ProfileSettings() {
   return (
     <div className="space-y-6">
       <PageHeader title="Meu perfil e segurança" />
-      <Section title="Perfil" description="A assinatura aparece em negrito no início das suas mensagens (ex.: *Ana — Nimber*).">
+      <Section title="Perfil" description="A assinatura aparece em negrito no início das suas mensagens (ex.: *Ana — Recepção*).">
         <div className="grid gap-4 md:grid-cols-2">
           <Field label="Nome">
             <Input value={name} onChange={(e) => setName(e.target.value)} />
           </Field>
           <Field label="Assinatura nas mensagens (opcional)">
-            <Input value={signature} onChange={(e) => setSignature(e.target.value)} placeholder="Ana — Nimber" />
+            <Input value={signature} onChange={(e) => setSignature(e.target.value)} placeholder="Ana — Recepção" />
           </Field>
         </div>
         <Button
