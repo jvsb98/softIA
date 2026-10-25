@@ -3,9 +3,10 @@
  */
 import { randomToken } from '../lib/crypto.js'
 import { loadConfig } from '../lib/config.js'
-import { db, migrateTenant, one, q } from '../lib/db.js'
+import { db, migrateTenant, one, q, tx } from '../lib/db.js'
 import { log } from '../lib/logger.js'
 import { schemaForSlug, SLUG_RE, withPlatform, withTenant, type TenantCtx } from '../lib/tenant.js'
+import { publishPlatformEvent } from './events.js'
 
 /** Subdomínios que nunca viram cliente. */
 export const RESERVED_SLUGS = new Set([
@@ -17,6 +18,7 @@ export type HostResolution = { kind: 'tenant'; tenant: TenantCtx } | { kind: 'pl
 
 const cache = new Map<string, { v: HostResolution; at: number }>()
 const TTL = 60_000
+const MAX_CACHE = 5_000 // hostnames aleatórios (varredura) não podem crescer o cache sem limite
 
 /** "Clinica.Exemplo.com:443." → "clinica.exemplo.com" */
 export function normalizeHost(h: string | undefined | null): string {
@@ -45,6 +47,7 @@ export async function resolveHost(hostHeader: string | undefined | null): Promis
     ),
   )
   const v: HostResolution = row ? { kind: 'tenant', tenant: tenantFromRow(row) } : { kind: 'unknown' }
+  if (cache.size >= MAX_CACHE) cache.clear()
   cache.set(host, { v, at: Date.now() })
   return v
 }
@@ -133,17 +136,28 @@ export async function createTenant(input: CreateTenantInput): Promise<CreateTena
     if (exists) throw new Error(`Já existe um cliente com o endereço "${slug}".`)
     const taken = await one(`SELECT 1 FROM domains WHERE hostname=$1`, [host])
     if (taken) throw new Error(`O endereço ${host} já está em uso.`)
-    const t = await one<any>(
-      `INSERT INTO tenants(slug, name, schema_name, segment) VALUES ($1,$2,$3,$4) RETURNING id, slug, schema_name, name, status`,
-      [slug, input.name.trim(), schema, input.segment ?? null],
-    )
-    await q(`INSERT INTO domains(hostname, tenant_id, kind) VALUES ($1,$2,'subdominio')`, [host, t.id])
-    return t
+    // Um schema que sobrou (cliente apagado à mão, restauração) nunca é reaproveitado
+    const leftover = await one(`SELECT 1 FROM pg_namespace WHERE nspname=$1`, [schema])
+    if (leftover) throw new Error(`O schema ${schema} já existe no banco. Remova-o (ou use outro endereço) antes de criar o cliente.`)
+    return tx(async (c) => {
+      const t = (
+        await c.query(`INSERT INTO tenants(slug, name, schema_name, segment) VALUES ($1,$2,$3,$4) RETURNING id, slug, schema_name, name, status`, [
+          slug,
+          input.name.trim(),
+          schema,
+          input.segment ?? null,
+        ])
+      ).rows[0]
+      await c.query(`INSERT INTO domains(hostname, tenant_id, kind) VALUES ($1,$2,'subdominio')`, [host, t.id])
+      return t
+    })
   })
   const tenant = tenantFromRow(row)
 
+  let schemaCreated = false
   try {
-    await migrateTenant(tenant)
+    await migrateTenant(tenant, { create: true })
+    schemaCreated = true
     const temp = input.adminPassword ? null : `Temp-${randomToken(6)}1`
     const { hashPassword } = await import('../auth/service.js')
     const hash = await hashPassword(input.adminPassword ?? temp!)
@@ -157,12 +171,24 @@ export async function createTenant(input: CreateTenantInput): Promise<CreateTena
       await q(`UPDATE settings SET value = jsonb_set(value, '{name}', to_jsonb($1::text)) WHERE key='org'`, [tenant.name])
     })
     invalidateHosts()
+    await publishPlatformEvent({ type: 'tenant.created', tenantId: tenant.id })
     log().info({ tenant: slug }, 'Cliente criado')
     return { tenant, url: tenantUrl(slug), adminEmail: input.adminEmail.trim().toLowerCase(), temporaryPassword: temp }
   } catch (e) {
     log().error({ err: e, tenant: slug }, 'Falha ao criar cliente; desfazendo')
-    await db().query(`DROP SCHEMA IF EXISTS "${schema}" CASCADE`).catch(() => {})
-    await withPlatform(() => q(`DELETE FROM tenants WHERE id=$1`, [tenant.id])).catch(() => {})
+    // Primeiro o registro (o domínio cai junto): o hostname deixa de apontar para o schema
+    await withPlatform(() => q(`DELETE FROM tenants WHERE id=$1`, [tenant.id])).catch((err) =>
+      log().error({ err, tenant: slug }, 'Rollback: não foi possível apagar o registro do cliente'),
+    )
+    invalidateHosts()
+    // Só apaga o schema se ele foi criado por esta operação (migrateTenant com create também pode ter criado e falhado depois)
+    // O schema não existia antes (conferido acima) e o slug está travado pelo registro: se existe agora, foi criado aqui
+    const created = schemaCreated || !!(await withPlatform(() => one(`SELECT 1 FROM pg_namespace WHERE nspname=$1`, [schema])).catch(() => null))
+    if (created) {
+      await db().query(`DROP SCHEMA IF EXISTS "${schema}" CASCADE`).catch((err) =>
+        log().error({ err, schema }, 'Rollback: não foi possível apagar o schema; remova-o manualmente'),
+      )
+    }
     throw e
   }
 }
@@ -171,4 +197,6 @@ export async function createTenant(input: CreateTenantInput): Promise<CreateTena
 export async function setTenantStatus(id: string, status: 'implantacao' | 'ativo' | 'suspenso' | 'cancelado') {
   await withPlatform(() => q(`UPDATE tenants SET status=$2, updated_at=now() WHERE id=$1`, [id, status]))
   invalidateHosts()
+  // Os servidores rodando param (ou retomam) as conexões e sockets desse cliente na hora
+  await publishPlatformEvent({ type: 'tenant.status', tenantId: id, status })
 }

@@ -183,7 +183,7 @@ async function main() {
         const t = await getTenant(slug)
         if (!t) throw new Error(`Cliente "${slug}" não encontrado.`)
         await setTenantStatus(t.id, status as any)
-        console.log(`${slug}: ${t.status} → ${status}. Reinicie o servidor para aplicar às conexões de WhatsApp.`)
+        console.log(`${slug}: ${t.status} → ${status}. Os servidores em execução aplicam na hora (conexões de WhatsApp e sessões abertas).`)
       })
       break
     }

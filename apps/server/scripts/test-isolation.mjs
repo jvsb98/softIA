@@ -42,7 +42,8 @@ function request(method, path, { host, cookie, body } = {}) {
         method,
         path,
         headers: {
-          host: host ?? BASE.host,
+          // como o navegador: Host com a porta, igual à Origin
+          host: host ? `${host}${BASE.port ? `:${BASE.port}` : ''}` : BASE.host,
           ...(cookie ? { cookie } : {}),
           ...(data ? { 'content-type': 'application/json', 'content-length': Buffer.byteLength(data) } : {}),
           ...(method !== 'GET' ? { origin: `http://${host}${BASE.port ? `:${BASE.port}` : ''}` } : {}),
@@ -91,7 +92,7 @@ function socketFor(t, cookie) {
   return io(`http://${BASE.hostname}:${BASE.port}`, {
     path: '/socket.io',
     transports: ['websocket'],
-    extraHeaders: { host: hostOf(t), cookie, origin: `http://${hostOf(t)}:${BASE.port}` },
+    extraHeaders: { host: `${hostOf(t)}:${BASE.port}`, cookie, origin: `http://${hostOf(t)}:${BASE.port}` },
     reconnection: false,
     timeout: 4000,
   })
@@ -123,7 +124,9 @@ async function main() {
   const cross = await request('POST', '/api/auth/login', { host: hostOf(B), body: { email: A.email, password: A.password } })
   check(cross.status === 401, 'credenciais do cliente A não valem no subdomínio B')
   check((await request('GET', '/api/auth/me', { host: hostOf(B), cookie: la.cookie })).status === 401, 'sessão do cliente A não vale no subdomínio B')
-  check((await request('GET', '/api/auth/me', { host: hostOf(A), cookie: la.cookie })).status === 200, 'sessão do cliente A vale no subdomínio A')
+  const meA = await request('GET', '/api/auth/me', { host: hostOf(A), cookie: la.cookie })
+  check(meA.status === 200, 'sessão do cliente A vale no subdomínio A')
+  const aUserId = meA.json?.user?.id ?? meA.json?.id
 
   // ---------------------------------------------------------------- dados
   const tagName = `so-do-A-${Date.now()}`
@@ -149,8 +152,36 @@ async function main() {
   // Mudar a presença do admin A emite "user:presence" para a equipe do cliente A
   sa.emit('presence', 'away')
   await new Promise((r) => setTimeout(r, 1200))
-  check(seenByA.some(([ev]) => ev === 'user:presence'), 'evento de tempo real chega à equipe do cliente A')
-  check(!seenByB.some(([ev]) => ev === 'user:presence'), 'evento de tempo real do cliente A NÃO chega ao cliente B')
+  // (o B recebe a presença do próprio admin ao conectar; o que não pode chegar é a do usuário de A)
+  const fromA = ([ev, d]) => ev === 'user:presence' && d?.userId === aUserId
+  check(!!aUserId && seenByA.some(fromA), 'evento de tempo real chega à equipe do cliente A')
+  check(!seenByB.some(fromA), 'evento de tempo real do cliente A NÃO chega ao cliente B')
+  // ---------------------------------------------------------------- suspensão aplicada na hora
+  const dropped = new Promise((resolve) => {
+    sb.on('disconnect', () => resolve(true))
+    setTimeout(() => resolve(false), 6000)
+  })
+  cli('tenant:status', B.slug, 'suspenso')
+  check(await dropped, 'suspender o cliente B derruba os sockets dele na hora')
+  await new Promise((r) => setTimeout(r, 500))
+  check((await request('GET', '/api/auth/me', { host: hostOf(B), cookie: lb.cookie })).status === 503, 'cliente B suspenso responde 503')
+  check((await request('GET', '/api/auth/me', { host: hostOf(A), cookie: la.cookie })).status === 200, 'cliente A continua funcionando')
+  cli('tenant:status', B.slug, 'ativo')
+  await new Promise((r) => setTimeout(r, 500))
+  check((await request('GET', '/api/auth/me', { host: hostOf(B), cookie: lb.cookie })).status === 200, 'cliente B reativado volta a funcionar')
+
+  // ---------------------------------------------------------------- escrita vinda de outro subdomínio (CSRF)
+  const csrf = await new Promise((resolve) => {
+    const data = JSON.stringify({ name: 'csrf', color: '#000000' })
+    const req = http.request(
+      { hostname: BASE.hostname, port: BASE.port, method: 'POST', path: '/api/tags',
+        headers: { host: `${hostOf(A)}:${BASE.port}`, cookie: la.cookie, origin: `http://${hostOf(B)}:${BASE.port}`, 'content-type': 'application/json', 'content-length': Buffer.byteLength(data) } },
+      (res) => { res.resume(); resolve(res.statusCode) },
+    )
+    req.end(data)
+  })
+  check(csrf === 403, 'escrita no cliente A vinda de página do cliente B é recusada')
+
   sa.close()
   sb.close()
   sx.close()

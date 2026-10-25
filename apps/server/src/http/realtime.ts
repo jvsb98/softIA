@@ -161,6 +161,11 @@ export function emitConversation(
   target.emit(event, data)
 }
 
+/** Derruba todos os sockets de um cliente (suspensão/cancelamento). */
+export function disconnectTenantSockets(tenantId: string) {
+  io?.in(`t:${tenantId}:staff`).disconnectSockets(true)
+}
+
 export function realtime() {
   return io
 }

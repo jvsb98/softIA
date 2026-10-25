@@ -9,9 +9,10 @@ Toda requisição, tarefa da fila e evento do WhatsApp roda dentro de um **conte
 | Peça | Arquivo | O que faz |
 |---|---|---|
 | Contexto | `src/lib/tenant.ts` | `AsyncLocalStorage` com `{kind:'tenant', id, slug, schema, name, status}` ou `{kind:'platform'}`. `withTenant`, `withPlatform`, `runInCtx`, `currentTenant`, `tenantOrNull`, `ctxKey` |
-| Banco | `src/lib/db.ts` | Um pool só. `q/one/tx` pegam uma conexão e aplicam `SET search_path TO t_x, <extensões>, public` quando ela veio de outro contexto. Sem contexto → `NoContextError` |
+| Banco | `src/lib/db.ts` | Um pool só. `q/one/tx` pegam uma conexão e aplicam `SET search_path TO t_x, <schema das extensões>` quando ela veio de outro contexto. `public` só entra se alguma extensão estiver lá, e então o servidor só sobe se `public` não tiver tabelas. Sem contexto → `NoContextError`. Pooler em modo transação (porta 6543) é recusado |
 | Migrações | `migrations/platform`, `migrations/tenant` | `migrate()` aplica a plataforma e depois cada cliente (exceto cancelados), com trava consultiva. Cada schema tem a própria `schema_migrations` |
-| Registro de clientes | `src/platform/tenants.ts` | Resolve o hostname (cache de 60 s; desconhecido, 5 s), cria cliente com rollback, muda situação |
+| Registro de clientes | `src/platform/tenants.ts` | Resolve o hostname (cache de 60 s; desconhecido, 5 s; no máximo 5.000 entradas), cria cliente (recusa schema que já exista; rollback apaga registro e depois schema), muda situação |
+| Avisos entre processos | `src/platform/events.ts` | `NOTIFY softia_platform`: suspender/cancelar para o WhatsApp e derruba os sockets do cliente nos servidores rodando |
 | HTTP | `src/http/app.ts` | Gancho `onRequest` resolve o `Host` e roda a requisição no contexto; reabre em `preValidation`. Hostname desconhecido → 404; cliente suspenso → 503. `/api/health` e `/api/platform/tls-check` atendem qualquer hostname |
 | Tempo real | `src/http/realtime.ts` | O cliente vem do `Host` do handshake; toda sala tem o prefixo `t:<id>:`; a origem precisa ser o próprio cliente |
 | Fila | `src/lib/jobs.ts` | `plataforma.jobs` com `tenant_id`. `enqueue` grava o cliente atual; o worker reabre o contexto. Singleton e `groupKey` valem por cliente. `every()` enfileira uma tarefa por cliente ativo. Cliente suspenso: a tarefa espera 1 h sem gastar tentativa |
@@ -27,4 +28,4 @@ Toda requisição, tarefa da fila e evento do WhatsApp roda dentro de um **conte
 5. **Código que roda fora de uma requisição** (timer, evento de biblioteca, callback): capture o contexto (`currentCtx()`) quando criar e rode com `runInCtx(ctx, ...)`.
 6. **Evento de tempo real:** use `emitStaff/emitManagers/emitUser/emitConversation`; eles colocam o prefixo do cliente sozinhos.
 7. **Requisição para URL informada por usuário:** `safeFetch` (bloqueia rede interna e confere o IP na conexão).
-8. Rode `scripts/test-isolation.mjs` antes de abrir um pull request que mexa em banco, sessão, fila ou tempo real.
+8. Rode `apps/server/scripts/test-isolation.mjs` antes de abrir um pull request que mexa em banco, sessão, fila ou tempo real.

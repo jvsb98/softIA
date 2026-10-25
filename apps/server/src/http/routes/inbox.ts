@@ -425,7 +425,11 @@ export async function inboxRoutes(app: FastifyInstance) {
     reply.header('Content-Type', f.mime)
     reply.header('Cache-Control', 'private, max-age=86400')
     const safeName = (f.filename ?? 'arquivo').replace(/[^\w.\- ]/g, '_')
-    reply.header('Content-Disposition', `${(req.query as any)?.download ? 'attachment' : 'inline'}; filename="${safeName}"`)
+    // Arquivo vindo do WhatsApp pode ser HTML/SVG: só imagem, áudio e vídeo abrem inline, e sempre em sandbox
+    const inlineOk = /^(image\/(png|jpe?g|gif|webp)|audio\/|video\/)/i.test(f.mime ?? '')
+    reply.header('Content-Disposition', `${(req.query as any)?.download || !inlineOk ? 'attachment' : 'inline'}; filename="${safeName}"`)
+    reply.header('Content-Security-Policy', 'sandbox')
+    reply.header('X-Content-Type-Options', 'nosniff')
     return reply.send(f.data)
   })
 

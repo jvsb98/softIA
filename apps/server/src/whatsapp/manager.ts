@@ -105,7 +105,15 @@ class Manager {
   private async startConn(id: string, name: string) {
     const t = currentTenant()
     if (!(await this.acquireLease(t, id))) {
-      log().warn({ conn: name, tenant: t.slug }, 'Outro processo já está com este número; conexão não iniciada aqui')
+      log().warn({ conn: name, tenant: t.slug }, 'Outro processo já está com este número; nova tentativa quando a lease vencer')
+      // Se o outro processo cair, a lease vence e este assume o número sozinho
+      const retry = setTimeout(() => {
+        void runInCtx(t, async () => {
+          const still = await one(`SELECT 1 FROM connections WHERE id=$1 AND enabled`, [id]).catch(() => null)
+          if (still) await this.startConn(id, name).catch((err) => log().error({ err, conn: name, tenant: t.slug }, 'Falha ao assumir a conexão'))
+        })
+      }, (LEASE_SECONDS + 5) * 1000)
+      retry.unref()
       return this.ensure(id, name)
     }
     const conn = this.ensure(id, name)

@@ -27,9 +27,16 @@ export const capabilities = { vector: false, unaccent: false, trgm: false }
  * Schemas onde as extensões estão instaladas (public num Postgres comum, "extensions" no Supabase).
  * Entram no fim do search_path de todo contexto para os tipos e funções delas (vector, unaccent...) resolverem.
  */
-let extPath = 'public'
+let extPath = 'pg_catalog'
 
 export function createPool(cfg: DatabaseConfig): pg.Pool {
+  // O SET search_path vale para a sessão: num pooler em modo transação (Supabase porta 6543, PgBouncer
+  // transaction) a consulta seguinte pode cair em outra sessão, com o schema de OUTRO cliente.
+  if (cfg.port === 6543 || (process.env.NIMBER_DB_POOL_MODE ?? '').toLowerCase() === 'transaction') {
+    throw new Error(
+      'Conexão por pooler em modo transação (porta 6543) não é suportada: use o pooler em modo SESSÃO (porta 5432) ou a conexão direta.',
+    )
+  }
   pool = new Pool({
     host: cfg.host,
     port: cfg.port,
@@ -123,10 +130,34 @@ function migrationsDir(kind: 'platform' | 'tenant'): string {
   throw new Error(`Pasta de migrações "${kind}" não encontrada`)
 }
 
-/** Schema onde novas extensões são criadas: "extensions" se existir (Supabase), senão public. */
+/**
+ * Schema onde novas extensões são criadas: sempre "extensions" (já existe no Supabase; criado aqui num
+ * Postgres comum). Assim o "public" não precisa entrar no search_path dos clientes.
+ */
 async function extensionTargetSchema(): Promise<string> {
-  const r = await one<{ ok: boolean }>(`SELECT EXISTS (SELECT 1 FROM pg_namespace WHERE nspname='extensions') AS ok`)
-  return r?.ok ? 'extensions' : 'public'
+  await db().query(`CREATE SCHEMA IF NOT EXISTS extensions`)
+  return 'extensions'
+}
+
+/**
+ * Trava de segurança: se "public" entrar no search_path (alguma extensão já instalada lá) e tiver
+ * tabelas, uma tabela que falte no schema do cliente cairia nos dados de "public". Nesse caso o
+ * servidor não sobe. Use um banco vazio (ou SOFTIA_ALLOW_PUBLIC_TABLES=true, por sua conta).
+ */
+async function assertPublicIsSafe() {
+  if (!extPath.split(', ').includes('public')) return
+  if ((process.env.SOFTIA_ALLOW_PUBLIC_TABLES ?? '').toLowerCase() === 'true') return
+  const r = await one<{ n: number }>(
+    `SELECT count(*)::int AS n FROM pg_class c JOIN pg_namespace n ON n.oid=c.relnamespace
+      WHERE n.nspname='public' AND c.relkind IN ('r','p','v','m','f')
+        AND NOT EXISTS (SELECT 1 FROM pg_depend d WHERE d.objid=c.oid AND d.deptype='e')`,
+  )
+  if ((r?.n ?? 0) > 0) {
+    throw new Error(
+      `O schema "public" deste banco tem ${r!.n} tabela(s) e está no caminho de busca por causa de extensões instaladas nele. ` +
+        'Use um banco vazio para o softIA (ou mova as extensões para o schema "extensions").',
+    )
+  }
 }
 
 async function tryExtension(name: string, schema: string): Promise<boolean> {
@@ -172,6 +203,7 @@ export async function migratePlatform(): Promise<string[]> {
     capabilities.vector = await tryExtension('vector', target)
     await tryExtension('pgcrypto', target)
     await refreshExtPath()
+    await assertPublicIsSafe()
     return applyFolder('platform', PLATFORM_SCHEMA)
   })
 }
@@ -186,16 +218,18 @@ export async function refreshExtPath(): Promise<void> {
     capabilities.unaccent = ns.some((r) => r.extname === 'unaccent')
     capabilities.trgm = ns.some((r) => r.extname === 'pg_trgm')
     capabilities.vector = ns.some((r) => r.extname === 'vector')
-    const schemas = [...new Set(ns.map((r) => r.nspname).filter((n) => n !== 'public'))].sort()
-    extPath = [...schemas.map(ident), 'public'].join(', ')
+    // "public" só entra no caminho se alguma das extensões estiver instalada lá
+    const schemas = [...new Set(ns.map((r) => r.nspname))].sort((a, b) => (a === 'public' ? 1 : b === 'public' ? -1 : a.localeCompare(b)))
+    extPath = schemas.length ? schemas.map((n) => (n === 'public' ? 'public' : ident(n))).join(', ') : 'pg_catalog'
   })
 }
 
 /** Cria (se preciso) e atualiza o schema de um cliente. */
-export async function migrateTenant(t: TenantCtx): Promise<string[]> {
+export async function migrateTenant(t: TenantCtx, opts: { create?: boolean } = {}): Promise<string[]> {
   if (!/^t_[a-z0-9_]{1,40}$/.test(t.schema)) throw new Error(`Schema de cliente inválido: ${t.schema}`)
   return withTenant(t, async () => {
-    await db().query(`CREATE SCHEMA IF NOT EXISTS ${ident(t.schema)}`)
+    // Na criação, o schema NÃO pode existir (nunca reaproveitar dados que sobraram de outro cliente)
+    await db().query(opts.create ? `CREATE SCHEMA ${ident(t.schema)}` : `CREATE SCHEMA IF NOT EXISTS ${ident(t.schema)}`)
     // Função de normalização usada na busca textual (com ou sem unaccent), criada dentro do schema do cliente.
     const ua = capabilities.unaccent
       ? await one<{ ns: string }>(`SELECT quote_ident(n.nspname) AS ns FROM pg_extension e JOIN pg_namespace n ON n.oid = e.extnamespace WHERE e.extname = 'unaccent'`)

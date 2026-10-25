@@ -115,7 +115,7 @@ Outros comandos, sempre com `exec softia node server/dist/cli.js`:
 | Comando | O que faz |
 |---|---|
 | `tenant:list` | Lista os clientes, a situação e os endereços |
-| `tenant:status alfa suspenso` | Suspende, reativa (`ativo`) ou cancela; reinicie o contêiner para aplicar às conexões de WhatsApp |
+| `tenant:status alfa suspenso` | Suspende, reativa (`ativo`) ou cancela; o servidor para ou retoma as conexões de WhatsApp e as sessões abertas na hora |
 | `reset-admin ana@alfa.com.br --tenant alfa` | Senha temporária e remoção do 2FA de um usuário |
 | `migrate` | Aplica migrações (o servidor já faz isso ao subir) |
 
@@ -134,6 +134,7 @@ As migrações rodam sozinhas ao subir, para a plataforma e para todos os client
 |---|---|
 | "Endereço não encontrado" no subdomínio | Cliente não existe, ou o slug está diferente do endereço |
 | Erro de certificado na primeira visita | O DNS ainda não aponta para o Droplet, ou os trechos do Caddy não foram copiados ou recarregados |
-| `prepared statement ... does not exist` ou a fila não anda | Conexão pelo pooler em modo transação (6543); troque para o modo sessão (5432) |
+| "pooler em modo transação ... não é suportada" ao subir | `NIMBER_DB_PORT=6543`; troque para o pooler em modo sessão (5432) |
+| "O schema public deste banco tem N tabela(s)" ao subir | O banco não está vazio; use um projeto/banco novo para o softIA |
 | `type "vector" does not exist` | Extensão criada fora do schema `extensions` ou `public`; rode `migrate` de novo |
 | Contêiner reiniciando por memória | Aumente o Droplet ou o `SOFTIA_MEM_LIMIT`; confira `docker stats` |

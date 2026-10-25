@@ -6,6 +6,7 @@
  * nativo das mensagens do provedor entre as rodadas.
  */
 import { decryptSecret } from '../lib/crypto.js'
+import { safeFetch } from '../lib/net-guard.js'
 
 export type ProviderKind = 'anthropic' | 'openai' | 'gemini' | 'openai_compatible' | 'mock'
 
@@ -69,7 +70,7 @@ async function http(url: string, init: RequestInit & { timeoutMs?: number }): Pr
   const ctrl = new AbortController()
   const t = setTimeout(() => ctrl.abort(), init.timeoutMs ?? 45_000)
   try {
-    const res = await fetch(url, { ...init, signal: ctrl.signal })
+    const res = await safeFetch(url, { ...init, signal: ctrl.signal })
     const text = await res.text()
     let data: any = null
     try {

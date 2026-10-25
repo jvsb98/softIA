@@ -21,8 +21,9 @@ import { runInCtx, tenantOrNull, withPlatform, type ExecCtx } from './tenant.js'
 const NIL = '00000000-0000-0000-0000-000000000000'
 
 /** Resolve o contexto de execução de uma tarefa a partir do tenant_id (injetado por quem registra os clientes). */
-let ctxResolver: (tenantId: string) => Promise<ExecCtx | null> = async () => null
-export function setJobContextResolver(fn: (tenantId: string) => Promise<ExecCtx | null>) {
+/** null = cliente suspenso (a tarefa espera); 'gone' = cancelado ou inexistente (a tarefa é descartada). */
+let ctxResolver: (tenantId: string) => Promise<ExecCtx | null | 'gone'> = async () => 'gone'
+export function setJobContextResolver(fn: (tenantId: string) => Promise<ExecCtx | null | 'gone'>) {
   ctxResolver = fn
 }
 /** Lista de clientes ativos para as tarefas recorrentes (every). */
@@ -31,7 +32,11 @@ export function setRecurringTenantLister(fn: () => Promise<ExecCtx[]>) {
   tenantLister = fn
 }
 
-class TenantUnavailable extends Error {}
+class TenantUnavailable extends Error {
+  constructor(message: string, readonly gone = false) {
+    super(message)
+  }
+}
 
 export interface EnqueueOptions {
   delayMs?: number
@@ -151,7 +156,8 @@ async function claim(queue: string, limit: number): Promise<Job[]> {
 async function execute(fn: Handler, job: Job) {
   if (!job.tenant_id) return withPlatform(() => fn(job))
   const ctx = await ctxResolver(job.tenant_id)
-  if (!ctx) throw new TenantUnavailable('Cliente suspenso, cancelado ou inexistente')
+  if (ctx === 'gone') throw new TenantUnavailable('Cliente cancelado ou inexistente', true)
+  if (!ctx) throw new TenantUnavailable('Cliente suspenso')
   return runInCtx(ctx, () => fn(job))
 }
 
@@ -160,6 +166,10 @@ async function finish(job: Job, err?: unknown) {
 }
 
 async function finishInPlatform(job: Job, err?: unknown) {
+  if (err instanceof TenantUnavailable && err.gone) {
+    await q(`UPDATE jobs SET status='failed', finished_at=now(), last_error=$2 WHERE id=$1`, [job.id, err.message])
+    return
+  }
   if (err instanceof TenantUnavailable) {
     // Cliente suspenso: a tarefa espera 1 hora sem gastar tentativa (volta a rodar se ele for reativado).
     await q(`UPDATE jobs SET status='queued', run_at=now() + interval '1 hour', attempts=greatest(attempts-1,0), locked_at=NULL, last_error=$2 WHERE id=$1`, [

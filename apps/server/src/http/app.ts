@@ -168,9 +168,19 @@ export async function buildApp(cfg: AppConfig): Promise<FastifyInstance> {
     if (!req.url.startsWith('/api/')) return
     if (!['GET', 'HEAD', 'OPTIONS'].includes(req.method)) {
       const origin = req.headers.origin as string | undefined
-      const host = req.headers.host
-      const sameHost = origin && host && new URL(origin).host === host
-      if (origin && !sameHost && !allowedOrigin(origin)) throw forbidden('Origem da requisição não permitida.')
+      if (origin) {
+        let originHost: string
+        try {
+          originHost = new URL(origin).host
+        } catch {
+          throw forbidden('Origem da requisição não permitida.') // ex.: "Origin: null"
+        }
+        if (originHost !== req.headers.host) {
+          // Subdomínios irmãos contam como o mesmo "site" para o SameSite: num cliente, só a própria origem escreve
+          const devOrigin = process.env.NODE_ENV !== 'production' && /^(localhost|127\.0\.0\.1)$/.test(originHost.replace(/:\d+$/, ''))
+          if (req.execCtx?.kind === 'tenant' ? !devOrigin : !allowedOrigin(origin)) throw forbidden('Origem da requisição não permitida.')
+        }
+      }
     }
     if (req.execCtx?.kind !== 'tenant') {
       // Painel do fornecedor: login próprio na Fase 2. Por ora só as rotas sem contexto de cliente.

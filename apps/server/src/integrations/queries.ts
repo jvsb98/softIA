@@ -11,6 +11,7 @@ import pg from 'pg'
 import { decryptSecret } from '../lib/crypto.js'
 import { one, q } from '../lib/db.js'
 import { log } from '../lib/logger.js'
+import { resolveSafeHost } from '../lib/net-guard.js'
 
 export interface ParamSpec {
   name: string
@@ -120,9 +121,11 @@ export function shapeRows(rows: any[], query: { output_fields: string[]; masks: 
 
 async function runOn(db: any, sql: string, values: Record<string, any>, timeoutMs: number, maxRows: number): Promise<any[]> {
   const password = decryptSecret(db.password_enc)
-  const ssl = db.ssl === 'false' ? false : db.ssl === 'true' ? { rejectUnauthorized: true } : { rejectUnauthorized: false }
+  // SaaS: o banco externo não pode ser um endereço interno do servidor (nem o nosso próprio Postgres)
+  const ip = await resolveSafeHost(db.host)
+  const ssl = db.ssl === 'false' ? false : db.ssl === 'true' ? { rejectUnauthorized: true, servername: db.host } : { rejectUnauthorized: false, servername: db.host }
   if (db.kind === 'postgres') {
-    const c = new pg.Client({ host: db.host, port: db.port, database: db.database, user: db.username, password, ssl, connectionTimeoutMillis: 8000, application_name: 'softia-consulta' })
+    const c = new pg.Client({ host: ip, port: db.port, database: db.database, user: db.username, password, ssl, connectionTimeoutMillis: 8000, application_name: 'softia-consulta' })
     await c.connect()
     try {
       await c.query('BEGIN READ ONLY')
@@ -136,7 +139,7 @@ async function runOn(db: any, sql: string, values: Record<string, any>, timeoutM
     }
   }
   if (db.kind === 'mysql') {
-    const c = await mysql.createConnection({ host: db.host, port: db.port, database: db.database, user: db.username, password, ssl: ssl || undefined, connectTimeout: 8000 })
+    const c = await mysql.createConnection({ host: ip, port: db.port, database: db.database, user: db.username, password, ssl: ssl || undefined, connectTimeout: 8000 })
     try {
       await c.query(`SET SESSION MAX_EXECUTION_TIME = ${Math.max(500, Math.min(60000, timeoutMs))}`)
       await c.query('START TRANSACTION READ ONLY')
@@ -150,12 +153,12 @@ async function runOn(db: any, sql: string, values: Record<string, any>, timeoutM
   }
   // SQL Server: o usuário deve ter apenas permissão de leitura (db_datareader)
   const pool = await new mssql.ConnectionPool({
-    server: db.host,
+    server: ip,
     port: db.port,
     database: db.database,
     user: db.username,
     password,
-    options: { encrypt: db.ssl !== 'false', trustServerCertificate: db.ssl === 'no-verify' },
+    options: { encrypt: db.ssl !== 'false', trustServerCertificate: db.ssl === 'no-verify', serverName: db.host },
     requestTimeout: timeoutMs,
     connectionTimeout: 8000,
   }).connect()

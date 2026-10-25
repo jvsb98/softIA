@@ -103,6 +103,7 @@ export async function resolveSession(token: string | undefined): Promise<Resolve
   // Expiração deslizante (atualiza no máximo 1x por minuto por sessão).
   const last = touchCache.get(id) ?? 0
   if (!s.mfa_pending && Date.now() - last > 60_000) {
+    if (touchCache.size > 20_000) touchCache.clear() // limite: muitas sessões não crescem a memória sem fim
     touchCache.set(id, Date.now())
     const sec = await getSetting('security', { sessionHours: 12 })
     void q(

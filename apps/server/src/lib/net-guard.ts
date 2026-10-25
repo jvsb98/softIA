@@ -77,6 +77,20 @@ export async function assertSafeUrl(raw: string): Promise<URL> {
   return u
 }
 
+/**
+ * Para conexões que não são HTTP (bancos externos): resolve o nome, recusa IPs bloqueados e devolve
+ * o IP para conectar direto nele (sem segunda resolução de DNS no meio do caminho).
+ */
+export async function resolveSafeHost(host: string): Promise<string> {
+  const h = host.trim().replace(/^\[|\]$/g, '')
+  if (!h) throw new Error('Informe o endereço do servidor.')
+  if (/^metadata(\.google\.internal)?$/i.test(h)) throw new Error('Endereço bloqueado por segurança.')
+  const ips = isIP(h) ? [h] : (await lookup(h, { all: true })).map((r) => r.address)
+  if (!ips.length) throw new Error('Endereço não encontrado.')
+  if (ips.some(blockedIp)) throw new Error('Endereço bloqueado por segurança (rede interna ou de metadados do servidor).')
+  return ips[0]!
+}
+
 /** fetch que valida o destino e cada redirecionamento (até 5). */
 export async function safeFetch(url: string, init: RequestInit = {}): Promise<Response> {
   let current = url
