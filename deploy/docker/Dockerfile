@@ -28,8 +28,8 @@ ENV NODE_ENV=production \
     HOST=0.0.0.0
 
 WORKDIR /app
-COPY --from=build --chown=node:node /src/out/nimber-atende/server ./server
-COPY --from=build --chown=node:node /src/out/nimber-atende/config-exemplo ./config-exemplo
+COPY --from=build --chown=node:node /src/out/softia/server ./server
+COPY --from=build --chown=node:node /src/out/softia/config-exemplo ./config-exemplo
 # /config: master.key (se não vier por NIMBER_MASTER_KEY), database.txt opcional, certificado do banco
 # /data:   logs e arquivos temporários
 RUN mkdir -p /config /data && chown node:node /config /data

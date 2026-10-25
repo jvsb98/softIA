@@ -28,7 +28,7 @@ export function createPool(cfg: DatabaseConfig): pg.Pool {
     password: cfg.password,
     max: cfg.poolMax,
     ssl: cfg.ssl === false ? false : { rejectUnauthorized: cfg.ssl === true, ca: cfg.sslCa },
-    application_name: 'nimber-atende',
+    application_name: 'softia',
     options: cfg.schema && cfg.schema !== 'public' ? `-c search_path=${cfg.schema},public` : undefined,
     idleTimeoutMillis: 30_000,
     connectionTimeoutMillis: 10_000,

@@ -1,7 +1,7 @@
 {
-  "name": "@nimber-atende/web",
+  "name": "@softia/web",
   "private": true,
-  "version": "1.0.4",
+  "version": "0.1.0",
   "type": "module",
   "scripts": {
     "dev": "vite",

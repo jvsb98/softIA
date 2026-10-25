@@ -23,7 +23,7 @@ import { registerFollowups } from './ops/followups.js'
 
 export async function registerModules(app: FastifyInstance, cfg: AppConfig) {
   const secure = cfg.server.publicUrl.startsWith('https://')
-  app.get('/api/health', async () => ({ ok: true, app: 'nimber-atende', version: APP_VERSION, time: new Date().toISOString() }))
+  app.get('/api/health', async () => ({ ok: true, app: 'softia', version: APP_VERSION, time: new Date().toISOString() }))
   await authRoutes(app, secure)
   await adminRoutes(app)
   await inboxRoutes(app)

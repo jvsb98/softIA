@@ -122,7 +122,7 @@ async function runOn(db: any, sql: string, values: Record<string, any>, timeoutM
   const password = decryptSecret(db.password_enc)
   const ssl = db.ssl === 'false' ? false : db.ssl === 'true' ? { rejectUnauthorized: true } : { rejectUnauthorized: false }
   if (db.kind === 'postgres') {
-    const c = new pg.Client({ host: db.host, port: db.port, database: db.database, user: db.username, password, ssl, connectionTimeoutMillis: 8000, application_name: 'nimber-atende-consulta' })
+    const c = new pg.Client({ host: db.host, port: db.port, database: db.database, user: db.username, password, ssl, connectionTimeoutMillis: 8000, application_name: 'softia-consulta' })
     await c.connect()
     try {
       await c.query('BEGIN READ ONLY')
