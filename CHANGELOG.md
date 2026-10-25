@@ -1,6 +1,27 @@
 # Changelog
 
-Todas as mudanças relevantes do Nimber Atende. Formato baseado em [Keep a Changelog](https://keepachangelog.com/pt-BR/1.1.0/); versões seguem [SemVer](https://semver.org/lang/pt-BR/).
+Todas as mudanças relevantes do softIA. Formato baseado em [Keep a Changelog](https://keepachangelog.com/pt-BR/1.1.0/); versões seguem [SemVer](https://semver.org/lang/pt-BR/). As entradas 1.0.x e anteriores são do Nimber Atende, base deste projeto.
+
+## [0.1.0] — 2026-10-25 · Fase 1: fundação multi-cliente
+
+### Adicionado
+- Um schema do PostgreSQL por cliente (`t_<slug>`) e o schema `plataforma` (clientes, domínios, fila de tarefas, leases do WhatsApp).
+- Contexto de execução (`lib/tenant.ts`): toda consulta roda no schema do cliente da requisição, tarefa ou evento; consulta sem contexto falha.
+- Cliente identificado pelo subdomínio (`<slug>.BASE_DOMAIN`); hostname desconhecido responde 404 e cliente suspenso, 503.
+- Fila de tarefas, tempo real (salas com prefixo do cliente), caches e conexões de WhatsApp separados por cliente; lease por número para mais de um processo no futuro.
+- Comandos `tenant:create`, `tenant:list` e `tenant:status`; `reset-admin` e `seed-demo` com `--tenant`.
+- `/api/platform/tls-check` para o Caddy emitir certificado só para hostnames de clientes (on-demand TLS).
+- Deploy no Droplet da Central com banco no Supabase (pooler em modo sessão), compose compartilhado, trechos de Caddy e patch para o Caddy da Central (`docs/DEPLOY.md`).
+- Teste de isolamento ponta a ponta (`apps/server/scripts/test-isolation.mjs`), rodando no CI.
+
+### Alterado
+- Extensões detectadas onde estiverem (`public` ou `extensions`, como no Supabase) e incluídas no `search_path`.
+- Sementes neutras para qualquer segmento (setores Atendimento, Comercial e Suporte; agente e follow-ups genéricos; sem critérios de qualificação e compliance da Nimber).
+- Prompts da IA, modelos de fluxo e telas sem referência à Nimber; emissor do 2FA é o nome do cliente; cabeçalhos de webhook `X-Webhook-Signature` e `X-Webhook-Event`.
+- `net-guard` bloqueia a rede interna por padrão (`NET_GUARD_ALLOW_PRIVATE=true` libera) e confere o IP na hora da conexão.
+
+### Removido
+- Instalador Windows, serviço WinSW, app desktop Electron e atualizador PowerShell.
 
 ## [1.0.4] — 2026-10-17
 

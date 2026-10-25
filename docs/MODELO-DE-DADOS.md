@@ -1,6 +1,6 @@
-# Modelo de dados
+# Modelo de dados (schema de cada cliente)
 
-Referência das tabelas do PostgreSQL do Nimber Atende, gerada a partir do banco após todas as migrações (`apps/server/migrations`).
+Referência das tabelas que cada cliente tem no próprio schema (`t_<slug>`), vindas do Nimber Atende (`apps/server/migrations/tenant`). A fila de tarefas (`jobs`) saiu daqui e foi para o schema `plataforma` (`apps/server/migrations/platform`), junto com `tenants`, `domains` e `wa_leases`; veja [MULTI-CLIENTE.md](MULTI-CLIENTE.md).
 
 Convenções: chaves primárias `uuid` (exceto tabelas de registro e a fila de tarefas, com `bigint` sequencial, e `user_sessions`, cujo id é o hash do token), datas em `timestamptz` (UTC no banco, exibidas em America/Sao_Paulo), segredos sempre cifrados com AES-256-GCM pela chave mestra (`master.key`).
 

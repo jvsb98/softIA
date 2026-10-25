@@ -1,8 +1,9 @@
 # syntax=docker/dockerfile:1.7
 # =====================================================================
-#  Nimber Atende — imagem do servidor (Linux / DigitalOcean)
-#  Build (na raiz do repositório):
-#    docker build -f deploy/docker/Dockerfile -t nimber-atende .
+#  softIA — imagem do servidor (Linux / DigitalOcean)
+#  Gerada pelo GitHub Actions (.github/workflows/docker.yml) — não compile no Droplet.
+#  Build manual (na raiz do repositório):
+#    docker build -f deploy/docker/Dockerfile -t softia .
 # =====================================================================
 
 # ---------- 1. build: compila web + servidor e monta o pacote de produção

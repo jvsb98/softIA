@@ -1,0 +1,17 @@
+# softIA — subdomínios dos clientes e painel do fornecedor (importado no fim do Caddyfile).
+# Qualquer hostname que não tenha bloco próprio cai aqui; o certificado só sai se o softIA confirmar
+# que o hostname existe (on_demand_tls → /api/platform/tls-check).
+https:// {
+	tls {
+		on_demand
+	}
+	encode zstd gzip
+	header {
+		Strict-Transport-Security "max-age=31536000"
+		-Server
+	}
+	# WebSocket (Socket.IO) é repassado automaticamente
+	reverse_proxy softia:8080 {
+		header_up X-Real-IP {remote_host}
+	}
+}

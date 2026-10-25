@@ -10,6 +10,7 @@
  * O servidor precisa ter sido iniciado com o mesmo BASE_DOMAIN.
  */
 import { execFileSync } from 'node:child_process'
+import { existsSync } from 'node:fs'
 import http from 'node:http'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
@@ -68,7 +69,10 @@ function request(method, path, { host, cookie, body } = {}) {
 }
 
 function cli(...args) {
-  return execFileSync('npx', ['tsx', 'src/cli.ts', ...args], { cwd: join(here, '..'), encoding: 'utf8', env: process.env })
+  const root = join(here, '..')
+  // usa o build (dist) quando existir; senão, o código-fonte via tsx
+  const [bin, pre] = existsSync(join(root, 'dist', 'cli.js')) ? ['node', ['dist/cli.js']] : ['npx', ['tsx', 'src/cli.ts']]
+  return execFileSync(bin, [...pre, ...args], { cwd: root, encoding: 'utf8', env: process.env })
 }
 
 async function ensureTenant(t, name) {
@@ -95,6 +99,7 @@ function socketFor(t, cookie) {
 
 const waitConnect = (s) =>
   new Promise((resolve) => {
+    if (s.connected) return resolve(true) // pode ter conectado enquanto esperávamos outro socket
     s.on('connect', () => resolve(true))
     s.on('connect_error', () => resolve(false))
     setTimeout(() => resolve(false), 5000)
