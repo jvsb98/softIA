@@ -144,5 +144,5 @@ INSERT INTO settings (key, value) VALUES
  ('ai',            '{"enabled":true,"historyMessages":24}'),
  ('qualification', '{"enabled":false,"threshold":22,"targetSectorSlug":"comercial","disqualifyBelow":null}'),
  ('handoff',       '{"explicitRequest":true,"qualified":true,"noAnswer":true,"sensitive":true,"frustration":true,"failures":true,"failureLimit":2,"existingCustomer":true,"supportSectorSlug":"suporte","legalSectorSlug":"suporte"}'),
- ('compliance',    '{"guardEnabled":false,"appendDisclaimer":false,"disclaimer":"","disclaimerTriggers":[]}')
+ ('compliance',    '{"guardEnabled":false,"prefilterEnabled":false,"appendDisclaimer":false,"disclaimer":"","disclaimerTriggers":[]}')
 ON CONFLICT (key) DO NOTHING;

@@ -30,7 +30,7 @@ export function DataSourcesSettings() {
     <div className="space-y-6">
       <PageHeader
         title="Consultas a outras bases"
-        description="A IA e os fluxos consultam dados vivos (ofertas abertas, carteira do investidor) por consultas cadastradas aqui. A IA nunca escreve SQL: ela escolhe a consulta e preenche os parâmetros."
+        description="A IA e os fluxos consultam dados vivos (estoque, status de pedidos, agenda de outro sistema) por consultas cadastradas aqui. A IA nunca escreve SQL: ela escolhe a consulta e preenche os parâmetros."
       />
       <Section
         title="Bases de dados"
@@ -176,7 +176,7 @@ function DbDialog({ db, onClose, onSaved }: { db: any; onClose: () => void; onSa
       <div className="space-y-4">
         <div className="grid grid-cols-2 gap-3">
           <Field label="Nome">
-            <Input value={f.name} onChange={(e) => setF({ ...f, name: e.target.value })} placeholder="Plataforma de tokenização (leitura)" />
+            <Input value={f.name} onChange={(e) => setF({ ...f, name: e.target.value })} placeholder="Sistema de gestão (leitura)" />
           </Field>
           <Field label="Tipo">
             <Select value={f.kind} onChange={(e) => setF({ ...f, kind: e.target.value, port: KIND[e.target.value]!.port })}>
@@ -298,7 +298,7 @@ function QueryDialog({ q, dbs, onClose, onSaved }: { q: any; dbs: any[]; onClose
             </Field>
           </div>
           <Field label="Quando usar (lido pela IA)">
-            <Textarea rows={2} value={f.description} onChange={(e) => setF({ ...f, description: e.target.value })} placeholder="Use quando o contato perguntar quais oportunidades estão disponíveis para investir agora." />
+            <Textarea rows={2} value={f.description} onChange={(e) => setF({ ...f, description: e.target.value })} placeholder="Use quando o contato perguntar o andamento do pedido dele." />
           </Field>
           <Field label="Base">
             <Select value={f.databaseId} onChange={(e) => setF({ ...f, databaseId: e.target.value })}>

@@ -48,8 +48,8 @@ function FractionField() {
         ))}
       </div>
       <div className="absolute inset-x-10 bottom-10 max-w-md text-linen">
-        <div className="font-display text-[30px] leading-tight">Cada conversa, uma fração de valor.</div>
-        <p className="mt-2 text-[14px] text-linen/70">Atendimento, qualificação e IA num só lugar, no número que seus clientes já conhecem.</p>
+        <div className="font-display text-[30px] leading-tight">Nenhum cliente sem resposta.</div>
+        <p className="mt-2 text-[14px] text-linen/70">Atendimento, agenda e acompanhamento num só lugar, no WhatsApp que seus clientes já usam.</p>
       </div>
     </div>
   )

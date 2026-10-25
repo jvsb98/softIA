@@ -606,7 +606,7 @@ function CriterionDialog({ c, onClose, onSaved }: { c: any; onClose: () => void;
           <Field label="Nome">
             <Input value={f.label} onChange={(e) => setF({ ...f, label: e.target.value })} />
           </Field>
-          <Field label="Chave" hint="ex.: valor_investimento">
+          <Field label="Chave" hint="ex.: tipo_servico">
             <Input value={f.key} onChange={(e) => setF({ ...f, key: e.target.value.toLowerCase().replace(/[^a-z0-9_]/g, '_') })} />
           </Field>
           <Field label="Tipo">
@@ -723,9 +723,9 @@ export function HandoffSettings() {
           {toggle('explicitRequest', 'Pedido explícito', '"Quero falar com uma pessoa".')}
           {toggle('qualified', 'Lead qualificado', 'Score atingiu o corte — vai para o setor de leads qualificados.')}
           {toggle('noAnswer', 'Sem resposta na base', 'A IA não encontrou a resposta no conhecimento.')}
-          {toggle('sensitive', 'Assunto sensível', 'Resgate, saque, reclamação, Procon, advogado. Vai para o Jurídico, se ativo, ou Suporte.')}
+          {toggle('sensitive', 'Assunto sensível', 'Reclamação formal, Procon, advogado, cobrança indevida. Vai para o setor de assuntos sensíveis.')}
           {toggle('frustration', 'Frustração', 'Irritação ou reclamação de demora.')}
-          {toggle('existingCustomer', 'Investidor com assunto da conta', 'Acesso, extrato, rendimentos — vai para o Suporte.')}
+          {toggle('existingCustomer', 'Cliente com assunto de pedido ou serviço', 'Andamento, pagamento, pós-venda — vai para o Suporte.')}
           {toggle('failures', 'Falhas de entendimento', 'A IA falhou seguidamente em responder.')}
           <Field label="Falhas seguidas antes de transferir">
             <Input type="number" min={1} max={10} value={v.failureLimit} onChange={(e) => s.setValue({ ...v, failureLimit: Number(e.target.value) })} className="w-24" />
@@ -734,7 +734,7 @@ export function HandoffSettings() {
       </Section>
       <Section title="Setores de destino">
         <div className="grid gap-4 md:grid-cols-2">
-          <Field label="Suporte ao investidor">
+          <Field label="Suporte (quem já é cliente)">
             <Select value={v.supportSectorSlug} onChange={(e) => s.setValue({ ...v, supportSectorSlug: e.target.value })}>
               {(sectors.data ?? []).map((x) => (
                 <option key={x.id} value={x.slug}>
@@ -764,7 +764,7 @@ export function HandoffSettings() {
 
 // ====================================================================== compliance
 export function ComplianceSettings() {
-  const s = useSettingForm('compliance', { guardEnabled: true, appendDisclaimer: true, disclaimer: '', disclaimerTriggers: [] as string[] })
+  const s = useSettingForm('compliance', { guardEnabled: false, prefilterEnabled: false, appendDisclaimer: false, disclaimer: '', disclaimerTriggers: [] as string[] })
   const [test, setTest] = useState('')
   const [result, setResult] = useState<any>(null)
   if (s.loading) return <Spinner />
@@ -772,19 +772,20 @@ export function ComplianceSettings() {
   return (
     <div className="space-y-6">
       <PageHeader title="Compliance" description="Travas que a IA não pode ultrapassar. Respostas bloqueadas não são enviadas: a conversa vai para um humano e o bloqueio fica na auditoria." />
-      <Section title="Travas absolutas" description="Sempre ativas no prompt do agente e no pré-filtro. Não podem ser desligadas.">
+      <Section title="Regras sempre ativas" description="Fazem parte das instruções do agente em todos os clientes.">
         <ul className="space-y-2 text-[13.5px] text-ink">
-          {['Nunca prometer ou projetar rentabilidade além do publicado na oferta', 'Nunca fazer recomendação personalizada de investimento', 'Nunca dar orientação jurídica ou tributária'].map((t) => (
+          {['Nunca inventar preços, prazos ou condições fora da base de conhecimento', 'Nunca prometer resultado, garantia ou desconto que não esteja na base', 'Nunca dar diagnóstico nem orientação médica, jurídica ou tributária'].map((t) => (
             <li key={t} className="flex items-center gap-2">
               <ShieldCheck className="size-4 text-ok" /> {t}
             </li>
           ))}
         </ul>
-        <div className="mt-4">
-          <Switch checked={v.guardEnabled} onChange={(x) => s.setValue({ ...v, guardEnabled: x })} label="Verificador por IA" description="Além do pré-filtro, um segundo modelo revisa cada resposta antes do envio." />
+        <div className="mt-4 space-y-3">
+          <Switch checked={!!v.prefilterEnabled} onChange={(x) => s.setValue({ ...v, prefilterEnabled: x })} label="Pré-filtro do setor financeiro" description="Bloqueia promessa de rentabilidade, recomendação de investimento e orientação tributária. Só para clientes do mercado financeiro." />
+          <Switch checked={v.guardEnabled} onChange={(x) => s.setValue({ ...v, guardEnabled: x })} label="Verificador por IA" description="Um segundo modelo revisa cada resposta da IA antes do envio (consome mais da franquia de IA)." />
         </div>
       </Section>
-      <Section title="Aviso de risco (disclaimer)" description="Pendente de validação do compliance. Anexado quando a IA fala de ofertas, valores ou rentabilidade (no máximo uma vez a cada 6 horas por conversa).">
+      <Section title="Aviso de risco (disclaimer)" description="Anexado quando a resposta da IA contém uma das palavras abaixo (no máximo uma vez a cada 6 horas por conversa). Ex.: aviso sobre valores aproximados ou sobre orientação profissional.">
         <div className="space-y-4">
           <Switch checked={v.appendDisclaimer} onChange={(x) => s.setValue({ ...v, appendDisclaimer: x })} label="Anexar aviso automaticamente" />
           <Field label="Texto do aviso">
@@ -800,7 +801,7 @@ export function ComplianceSettings() {
       </Section>
       <Section title="Testar uma resposta" description="Cole uma frase para ver se ela seria bloqueada.">
         <div className="flex gap-2">
-          <Input value={test} onChange={(e) => setTest(e.target.value)} placeholder="Ex.: Esse investimento tem retorno garantido de 1% ao mês." />
+          <Input value={test} onChange={(e) => setTest(e.target.value)} placeholder="Ex.: Garantimos entrega em 2 dias com desconto de 30%." />
           <Button onClick={async () => setResult(await api.post('/api/ai/compliance/check', { text: test }))} disabled={!test}>
             Verificar
           </Button>

@@ -1,7 +1,9 @@
 /**
  * Travas de compliance — três camadas:
  *  1. instruções explícitas no prompt do agente (ver agent.ts);
- *  2. pré-filtro determinístico (expressões abaixo);
+ *  2. pré-filtro determinístico do setor financeiro (expressões abaixo), ligado por cliente
+ *     (settings.compliance.prefilterEnabled) — desligado por padrão: para uma marmoraria,
+ *     "sem risco de quebrar" é uma frase legítima;
  *  3. verificador por IA (tarefa "guard") que aprova ou bloqueia o rascunho.
  * Resposta bloqueada NÃO é enviada: vai para humano e fica registrada na auditoria.
  */
@@ -56,8 +58,8 @@ Explicar como funciona a tokenização, o que é uma oferta, prazos e caracterí
 Responda SOMENTE com JSON: {"ok": true|false, "violations": [{"rule": "rentabilidade|recomendacao|juridico_tributario", "excerpt": "trecho"}]}`
 
 export async function checkCompliance(draft: string, conversationId: string | null): Promise<{ ok: boolean; rule?: Rule; excerpt?: string; by?: 'filtro' | 'ia' }> {
-  const settings = await getSetting('compliance', { guardEnabled: true })
-  const pre = prefilter(draft)
+  const settings = await getSetting('compliance', { guardEnabled: false, prefilterEnabled: false })
+  const pre = settings.prefilterEnabled ? prefilter(draft) : null
   if (pre) return { ok: false, rule: pre.rule, excerpt: pre.excerpt, by: 'filtro' }
   if (!settings.guardEnabled) return { ok: true }
   try {

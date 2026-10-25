@@ -80,7 +80,7 @@ function DocumentsTab() {
           }}
         >
           <Upload className="size-5 text-muted" />
-          <div className="flex-1 text-[13.5px] text-ink-2">Arraste PDFs, DOCX, TXT ou Markdown aqui — material institucional, ofertas, regulamentos, explicações sobre tokenização.</div>
+          <div className="flex-1 text-[13.5px] text-ink-2">Arraste PDFs, DOCX, TXT ou Markdown aqui — material institucional, catálogo de serviços, preços de referência, perguntas frequentes.</div>
           <input ref={fileRef} type="file" multiple hidden accept=".pdf,.docx,.txt,.md,.html" onChange={(e) => e.target.files && void upload(e.target.files)} />
           <Button icon={<FileText className="size-4" />} onClick={() => fileRef.current?.click()}>
             Enviar arquivo
@@ -185,7 +185,7 @@ function AddDocDialog({ mode, onClose, onDone }: { mode: 'text' | 'site'; onClos
     >
       <div className="space-y-4">
         <Field label="Título">
-          <Input value={title} onChange={(e) => setTitle(e.target.value)} placeholder={mode === 'site' ? 'Site institucional — página inicial' : 'Como funciona a tokenização'} />
+          <Input value={title} onChange={(e) => setTitle(e.target.value)} placeholder={mode === 'site' ? 'Site institucional — página inicial' : 'Como funciona o orçamento'} />
         </Field>
         {mode === 'text' ? (
           <Field label="Conteúdo">
@@ -291,7 +291,7 @@ function FaqDialog({ item, onClose, onDone }: { item: any; onClose: () => void; 
     >
       <div className="space-y-4">
         <Field label="Pergunta">
-          <Input value={f.question} onChange={(e) => setF({ ...f, question: e.target.value })} placeholder="Qual o valor mínimo para investir?" />
+          <Input value={f.question} onChange={(e) => setF({ ...f, question: e.target.value })} placeholder="Qual o prazo de entrega?" />
         </Field>
         <Field label="Resposta oficial">
           <Textarea rows={6} value={f.answer} onChange={(e) => setF({ ...f, answer: e.target.value })} />
@@ -325,7 +325,7 @@ function TestTab() {
           }
         }}
       >
-        <Input value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Qual o prazo para resgatar o investimento?" />
+        <Input value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Vocês atendem convênio?" />
         <Button variant="primary" icon={<Search className="size-4" />} loading={busy}>
           Buscar
         </Button>

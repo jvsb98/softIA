@@ -246,7 +246,7 @@ function ConnectionDialog({ conn, onClose }: { conn: any; onClose: () => void })
     >
       <div className="space-y-4">
         <div className="grid grid-cols-[1fr_120px] gap-3">
-          <Field label="Nome da conexão" hint="Ex.: Comercial, Suporte ao investidor">
+          <Field label="Nome da conexão" hint="Ex.: Comercial, Recepção">
             <Input value={f.name} onChange={(e) => setF({ ...f, name: e.target.value })} />
           </Field>
           <Field label="Cor">

@@ -97,7 +97,7 @@ export function ContextPanel({ conversation }: { conversation: any }) {
         </Select>
         <label className="mt-3 flex items-center gap-2 text-[13px] text-ink-2">
           <input type="checkbox" checked={!!contact?.is_customer} onChange={(e) => save.mutate({ isCustomer: e.target.checked })} className="accent-[var(--coral)]" />
-          Já é investidor (cliente)
+          Já é cliente
         </label>
       </div>
 

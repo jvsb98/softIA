@@ -255,7 +255,7 @@ export function TagsSettings() {
       <PageHeader title="Etiquetas" description="Classifique contatos (origem, interesse, campanha). As etiquetas aparecem na conversa e servem de filtro." />
       <Section title="Nova etiqueta">
         <div className="flex gap-2">
-          <Input value={name} onChange={(e) => setName(e.target.value)} placeholder="Ex.: Interesse Hive SP" className="max-w-xs" />
+          <Input value={name} onChange={(e) => setName(e.target.value)} placeholder="Ex.: Orçamento enviado" className="max-w-xs" />
           <Input type="color" value={color} onChange={(e) => setColor(e.target.value)} className="h-10 w-14 p-1" />
           <Button
             variant="primary"
@@ -351,7 +351,7 @@ export function SecuritySettings() {
       <Section title="Autenticação">
         <div className="space-y-4">
           <Switch checked={v.require2faAdmins} onChange={(x) => s.setValue({ ...v, require2faAdmins: x })} label="Exigir 2FA de administradores" />
-          <Switch checked={v.require2faAll} onChange={(x) => s.setValue({ ...v, require2faAll: x })} label="Exigir 2FA de todos os usuários" description="Recomendado: a plataforma lida com dados de investidores." />
+          <Switch checked={v.require2faAll} onChange={(x) => s.setValue({ ...v, require2faAll: x })} label="Exigir 2FA de todos os usuários" description="Recomendado quando a equipe lida com dados sensíveis dos clientes (ex.: saúde)." />
           <div className="grid gap-5 md:grid-cols-2">
             <NumberField label="Duração da sessão sem uso" value={v.sessionHours} onChange={(n) => s.setValue({ ...v, sessionHours: n })} suffix="horas" min={1} max={720} />
             <NumberField label="Tamanho mínimo de senha" value={v.passwordMinLength} onChange={(n) => s.setValue({ ...v, passwordMinLength: n })} suffix="caracteres" min={8} max={64} />
