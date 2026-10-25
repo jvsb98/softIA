@@ -4,7 +4,8 @@
  * e acompanha o banco na migração para a nuvem.
  */
 import { BufferJSON, initAuthCreds, proto, type AuthenticationCreds, type AuthenticationState, type SignalDataTypeMap } from '@whiskeysockets/baileys'
-import { db, q } from '../lib/db.js'
+import { q, tx } from '../lib/db.js'
+import { currentCtx, NoContextError, runInCtx } from '../lib/tenant.js'
 
 const serialize = (v: unknown) => JSON.stringify(v, BufferJSON.replacer)
 const revive = (v: unknown) => JSON.parse(JSON.stringify(v), BufferJSON.reviver)
@@ -14,21 +15,25 @@ export async function usePostgresAuthState(connectionId: string): Promise<{
   saveCreds: () => Promise<void>
   clear: () => Promise<void>
 }> {
+  // O Baileys chama get/set de dentro dos próprios eventos: fixa o contexto do cliente dono da conexão.
+  const ctx = currentCtx()
+  if (!ctx) throw new NoContextError()
+  const inCtx = <T>(fn: () => Promise<T>) => runInCtx(ctx, fn)
   const row = (await q(`SELECT value FROM wa_auth_keys WHERE connection_id=$1 AND category='creds' AND key_id=''`, [connectionId]))[0]
   const creds: AuthenticationCreds = row ? revive(row.value) : initAuthCreds()
 
-  const saveCreds = async () => {
+  const saveCreds = () => inCtx(async () => {
     await q(
       `INSERT INTO wa_auth_keys(connection_id, category, key_id, value) VALUES ($1,'creds','',$2::jsonb)
        ON CONFLICT (connection_id, category, key_id) DO UPDATE SET value=EXCLUDED.value, updated_at=now()`,
       [connectionId, serialize(creds)],
     )
-  }
+  })
 
   const state: AuthenticationState = {
     creds,
     keys: {
-      get: async (type, ids) => {
+      get: (type, ids) => inCtx(async () => {
         const out: { [id: string]: SignalDataTypeMap[typeof type] } = {}
         if (!ids.length) return out
         const rows = await q<{ key_id: string; value: unknown }>(
@@ -41,11 +46,8 @@ export async function usePostgresAuthState(connectionId: string): Promise<{
           out[r.key_id] = value
         }
         return out
-      },
-      set: async (data) => {
-        const client = await db().connect()
-        try {
-          await client.query('BEGIN')
+      }),
+      set: (data) => inCtx(() => tx(async (client) => {
           for (const category of Object.keys(data) as (keyof SignalDataTypeMap)[]) {
             const entries = data[category] ?? {}
             for (const id of Object.keys(entries)) {
@@ -61,20 +63,13 @@ export async function usePostgresAuthState(connectionId: string): Promise<{
               }
             }
           }
-          await client.query('COMMIT')
-        } catch (e) {
-          await client.query('ROLLBACK').catch(() => {})
-          throw e
-        } finally {
-          client.release()
-        }
-      },
+        })),
     },
   }
 
-  const clear = async () => {
+  const clear = () => inCtx(async () => {
     await q(`DELETE FROM wa_auth_keys WHERE connection_id=$1`, [connectionId])
-  }
+  })
 
   return { state, saveCreds, clear }
 }

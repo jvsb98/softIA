@@ -166,7 +166,7 @@ export async function runAgentTurn(conv: ConversationRow, opts: TurnOptions): Pr
     failureLimit: 2,
     existingCustomer: true,
     supportSectorSlug: 'suporte',
-    legalSectorSlug: 'juridico',
+    legalSectorSlug: 'suporte',
   })
   const agent = opts.agentId ? await one<any>(`SELECT * FROM ai_agents WHERE id=$1`, [opts.agentId]) : await defaultAgent()
   if (!agent) return { kind: 'error', reason: 'Nenhum agente de IA configurado' }

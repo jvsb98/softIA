@@ -26,7 +26,7 @@ interface Attempt {
 const DEFAULTS = {
   enabled: true,
   onlyBusinessHours: true,
-  hoursSectorSlug: 'sdr',
+  hoursSectorSlug: 'atendimento',
   applyTo: 'automation' as 'automation' | 'all',
   attempts: [] as Attempt[],
   autoCloseAfterHours: 48,

@@ -1,26 +1,27 @@
 /**
- * Nimber Atende — servidor
+ * softIA — servidor
  */
 import { loadConfig } from './lib/config.js'
 import { setMasterKey } from './lib/crypto.js'
 import { createPool, migrate } from './lib/db.js'
-import { startJobs, stopJobs } from './lib/jobs.js'
+import { setJobContextResolver, setRecurringTenantLister, startJobs, stopJobs } from './lib/jobs.js'
 import { createLogger } from './lib/logger.js'
 import { buildApp } from './http/app.js'
 import { initRealtime } from './http/realtime.js'
 import { registerModules } from './modules.js'
 import { manager } from './whatsapp/manager.js'
+import { getTenantCached, listRunningTenants } from './platform/tenants.js'
 
 async function main() {
   let cfg
   try {
     cfg = loadConfig()
   } catch (err) {
-    console.error(`\n[Nimber Atende] ${(err as Error).message}\n`)
+    console.error(`\n[softIA] ${(err as Error).message}\n`)
     process.exit(2)
   }
   const log = createLogger(cfg.server.logLevel, cfg.server.dataDir)
-  log.info({ configDir: cfg.configDir, db: `${cfg.database.user}@${cfg.database.host}:${cfg.database.port}/${cfg.database.database}` }, 'Iniciando Nimber Atende')
+  log.info({ configDir: cfg.configDir, db: `${cfg.database.user}@${cfg.database.host}:${cfg.database.port}/${cfg.database.database}` }, 'Iniciando softIA')
   setMasterKey(cfg.masterKey)
 
   createPool(cfg.database)
@@ -43,9 +44,15 @@ async function main() {
   await registerModules(app, cfg)
   await app.listen({ port: cfg.server.port, host: cfg.server.host })
   initRealtime(app.server, (app as any).allowedOrigin)
+  // Fila: cada tarefa roda no contexto do cliente dono; recorrentes (every) rodam para cada cliente ativo
+  setJobContextResolver(async (id) => {
+    const t = await getTenantCached(id)
+    return t && (t.status === 'ativo' || t.status === 'implantacao') ? t : null
+  })
+  setRecurringTenantLister(listRunningTenants)
   await startJobs()
-  await manager.startAll()
-  log.info(`Nimber Atende disponível em ${cfg.server.publicUrl} (porta ${cfg.server.port})`)
+  await manager.startAll(await listRunningTenants())
+  log.info(`softIA disponível em ${cfg.server.publicUrl} (porta ${cfg.server.port})`)
 
   let closing = false
   const shutdown = async (signal: string) => {

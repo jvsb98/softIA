@@ -5,45 +5,45 @@
 import { one, q } from '../lib/db.js'
 
 const people = [
-  { name: 'Marina Albuquerque', phone: '5541988110001', status: 'em_qualificacao', score: 14, origin: 'Instagram — Hive SP' },
-  { name: 'Rafael Couto', phone: '5511977220002', status: 'qualificado', score: 27, origin: 'Site — simulador' },
+  { name: 'Marina Albuquerque', phone: '5541988110001', status: 'em_qualificacao', score: 14, origin: 'Instagram' },
+  { name: 'Rafael Couto', phone: '5511977220002', status: 'qualificado', score: 27, origin: 'Site' },
   { name: 'Beatriz Lemos', phone: '5541966330003', status: 'cliente', score: null, origin: 'Indicação' },
   { name: 'Otávio Prado', phone: '5521955440004', status: 'novo', score: null, origin: 'Google Ads' },
-  { name: 'Lívia Tanaka', phone: '5541944550005', status: 'desqualificado', score: 6, origin: 'Instagram — Hive SP' },
+  { name: 'Lívia Tanaka', phone: '5541944550005', status: 'desqualificado', score: 6, origin: 'Instagram' },
 ]
 
 const scripts: { status: string; sector: string; reason?: string; msgs: [('in' | 'out'), string, string?][] }[] = [
   {
     status: 'automation',
-    sector: 'sdr',
+    sector: 'atendimento',
     msgs: [
-      ['in', 'Oi! Vi o anúncio do Hive SP. Como funciona investir com R$ 5 mil?'],
-      ['out', 'Olá, Marina! Que bom ter você por aqui. No Hive SP você adquire frações tokenizadas de um ativo imobiliário, a partir de valores menores. Posso te fazer três perguntas rápidas para indicar o melhor caminho?', 'ai'],
+      ['in', 'Oi! Vocês fazem bancada de cozinha em granito?'],
+      ['out', 'Olá, Marina! Fazemos sim. Para preparar o orçamento, posso te fazer três perguntas rápidas?', 'ai'],
       ['in', 'Pode sim'],
-      ['out', 'Você já investe em renda fixa, fundos ou imóveis hoje?', 'ai'],
-      ['in', 'Tenho CDB e um pouco em fundo imobiliário'],
+      ['out', 'Qual é a medida aproximada da bancada, em metros?', 'ai'],
+      ['in', 'Uns 2,40 por 0,60'],
     ],
   },
   {
     status: 'queued',
-    sector: 'closer',
-    reason: 'Lead qualificado (score 27) — quer falar com especialista',
+    sector: 'comercial',
+    reason: 'Pediu visita técnica para medição',
     msgs: [
-      ['in', 'Quero entender o contrato do Hive SP antes de aplicar 80 mil'],
-      ['out', 'Perfeito, Rafael. Vou te conectar com um especialista do nosso time comercial agora.', 'ai'],
+      ['in', 'Quero marcar a visita para medir a escada'],
+      ['out', 'Perfeito, Rafael. Vou te passar para o nosso time comercial agendar a visita.', 'ai'],
     ],
   },
   {
     status: 'open',
     sector: 'suporte',
-    reason: 'Cliente com dúvida sobre a conta',
+    reason: 'Cliente com dúvida sobre a instalação',
     msgs: [
-      ['in', 'Boa tarde, não estou conseguindo ver meus tokens no app'],
-      ['out', 'Boa tarde, Beatriz! Vou verificar com você. Você está acessando pelo app.nimber.com.br ou pelo celular?', 'agent'],
-      ['in', 'Pelo celular'],
+      ['in', 'Boa tarde, a instalação da pia ficou marcada para quando?'],
+      ['out', 'Boa tarde, Beatriz! Vou confirmar com a equipe de instalação e já te retorno.', 'agent'],
+      ['in', 'Obrigada'],
     ],
   },
-  { status: 'queued', sector: 'sdr', reason: 'Pedido explícito para falar com uma pessoa', msgs: [['in', 'Prefiro falar com um atendente, por favor']] },
+  { status: 'queued', sector: 'atendimento', reason: 'Pedido explícito para falar com uma pessoa', msgs: [['in', 'Prefiro falar com um atendente, por favor']] },
 ]
 
 export async function seedDemo() {
@@ -51,7 +51,7 @@ export async function seedDemo() {
   if (!conn) {
     conn = await one(
       `INSERT INTO connections(name, color, status, enabled, default_sector_id) VALUES ('Comercial (demonstração)','#FE5A51','disconnected', false,
-        (SELECT id FROM sectors WHERE slug='sdr')) RETURNING id, name`,
+        (SELECT id FROM sectors WHERE slug='atendimento')) RETURNING id, name`,
     )
   }
   const admin = await one<any>(`SELECT id FROM users WHERE role='admin' ORDER BY created_at LIMIT 1`)

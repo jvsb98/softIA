@@ -35,6 +35,10 @@ export interface ServerConfig {
   trustProxy: boolean
   logLevel: string
   dataDir: string
+  /** Domínio-base dos clientes: <slug>.<baseDomain> (ex.: connectawork.app.br; em desenvolvimento, localhost) */
+  baseDomain: string
+  /** Hostname do painel do fornecedor (ex.: painel.connectawork.app.br) */
+  platformHost: string
 }
 
 export interface AppConfig {
@@ -200,7 +204,7 @@ function loadDatabase(configDir: string): DatabaseConfig {
     password: revealSecret(password, 'PASSWORD do database.txt'),
     ssl: sslRaw === 'true' ? true : sslRaw === 'no-verify' ? 'no-verify' : false,
     sslCa,
-    poolMax: Number(kv.POOL_MAX ?? 15),
+    poolMax: Number(env.NIMBER_DB_POOL_MAX ?? kv.POOL_MAX ?? 10),
     schema: env.NIMBER_DB_SCHEMA ?? kv.SCHEMA ?? 'public',
   }
 }
@@ -211,6 +215,7 @@ function loadServer(configDir: string): ServerConfig {
   const env = process.env
   const port = Number(env.PORT ?? kv.PORT ?? 8080)
   const dataDir = resolve(configDir, '..', 'data')
+  const baseDomain = (env.BASE_DOMAIN ?? kv.BASE_DOMAIN ?? 'localhost').toLowerCase().replace(/^\.+|\.+$/g, '')
   return {
     port,
     host: env.HOST ?? kv.HOST ?? '0.0.0.0',
@@ -218,6 +223,8 @@ function loadServer(configDir: string): ServerConfig {
     trustProxy: (env.TRUST_PROXY ?? kv.TRUST_PROXY ?? 'false').toLowerCase() === 'true',
     logLevel: env.LOG_LEVEL ?? kv.LOG_LEVEL ?? 'info',
     dataDir,
+    baseDomain,
+    platformHost: (env.PLATFORM_HOST ?? kv.PLATFORM_HOST ?? `painel.${baseDomain}`).toLowerCase(),
   }
 }
 

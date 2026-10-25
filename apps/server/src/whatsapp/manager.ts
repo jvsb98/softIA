@@ -1,9 +1,11 @@
 /**
  * Gerencia todas as conexões (números) e transforma eventos do WhatsApp em atendimento.
  */
-import { createHash } from 'node:crypto'
+import { createHash, randomBytes } from 'node:crypto'
+import { hostname } from 'node:os'
 import type { WAMessage } from '@whiskeysockets/baileys'
 import { one, q } from '../lib/db.js'
+import { currentTenant, runInCtx, tenantOrNull, withPlatform, withTenant, type TenantCtx } from '../lib/tenant.js'
 import { log } from '../lib/logger.js'
 import { emitStaff } from '../http/realtime.js'
 import {
@@ -19,76 +21,177 @@ import { hooks } from '../inbox/hooks.js'
 import { WaConnection, type ConnStatus } from './connection.js'
 import { digits, isIgnorableJid, lidOf, phoneForLid, phoneFromPnJid, rememberLid } from './jid.js'
 import { parseMessage } from './parse.js'
+import { cancelGroup } from '../lib/jobs.js'
 
 const MAX_AGE_MS = 24 * 60 * 60 * 1000 // ignora mensagens mais velhas que 24h (histórico)
 
+/** Identifica este processo nas leases (só um processo segura cada número). */
+const HOLDER = `${hostname()}:${process.pid}:${randomBytes(3).toString('hex')}`
+const LEASE_SECONDS = 45
+const HEARTBEAT_MS = 15_000
+
+/**
+ * Multi-cliente: as conexões ficam indexadas por "<cliente>:<conexão>" e cada uma guarda o contexto do
+ * cliente dono; todo evento do Baileys é tratado dentro desse contexto. As consultas get/list/connect
+ * só enxergam as conexões do cliente atual.
+ */
 class Manager {
   private conns = new Map<string, WaConnection>()
+  private owners = new Map<string, TenantCtx>()
+  private heartbeat: NodeJS.Timeout | null = null
+
+  private key(id: string, t: TenantCtx = currentTenant()) {
+    return `${t.id}:${id}`
+  }
 
   get(id: string) {
-    return this.conns.get(id)
+    const t = tenantOrNull()
+    return t ? this.conns.get(this.key(id, t)) : undefined
   }
 
+  /** Conexões do cliente atual. */
   list() {
-    return [...this.conns.values()]
+    const t = tenantOrNull()
+    if (!t) return []
+    const prefix = `${t.id}:`
+    return [...this.conns.entries()].filter(([k]) => k.startsWith(prefix)).map(([, c]) => c)
   }
 
-  /** Na inicialização: reconecta automaticamente quem já tem sessão pareada. */
-  async startAll() {
+  /** Na inicialização: reconecta, em cada cliente ativo, quem já tem sessão pareada. */
+  async startAll(tenants: TenantCtx[]) {
+    for (const t of tenants) await withTenant(t, () => this.startTenant()).catch((err) => log().error({ err, tenant: t.slug }, 'Falha ao iniciar conexões do cliente'))
+    this.startHeartbeat()
+  }
+
+  /** Inicia as conexões pareadas do cliente atual. */
+  async startTenant() {
+    const t = currentTenant()
     const rows = await q<any>(
       `SELECT c.id, c.name, EXISTS (SELECT 1 FROM wa_auth_keys k WHERE k.connection_id=c.id AND k.category='creds' AND k.value ? 'me') AS paired
          FROM connections c WHERE c.enabled`,
     )
     for (const r of rows) {
-      const conn = this.ensure(r.id, r.name)
-      if (r.paired) await conn.start().catch((err) => log().error({ err, conn: r.name }, 'Falha ao iniciar conexão'))
+      if (r.paired) await this.startConn(r.id, r.name).catch((err) => log().error({ err, conn: r.name, tenant: t.slug }, 'Falha ao iniciar conexão'))
       else await this.persistStatus(r.id, 'disconnected', null)
     }
-    log().info({ total: rows.length }, 'Conexões WhatsApp inicializadas')
+    log().info({ tenant: t.slug, total: rows.length }, 'Conexões WhatsApp inicializadas')
+  }
+
+  /** Para todas as conexões do cliente atual (suspensão, cancelamento). */
+  async stopTenant() {
+    for (const c of this.list()) await this.remove(c.id)
   }
 
   ensure(id: string, name: string) {
-    let conn = this.conns.get(id)
+    const t = currentTenant()
+    const k = this.key(id, t)
+    let conn = this.conns.get(k)
     if (conn) return conn
     conn = new WaConnection(id, name)
-    conn.on('status', (s) => void this.onStatus(id, s))
-    conn.on('message', (m: WAMessage, type: string) => {
-      this.onMessage(conn!, m, type).catch((err) => log().error({ err, conn: name }, 'Erro ao processar mensagem recebida'))
-    })
-    conn.on('receipt', (waId: string, status: 'sent' | 'delivered' | 'read') => {
+    const inCtx = <A extends unknown[]>(fn: (...a: A) => void) => (...a: A) => runInCtx(t, () => fn(...a))
+    conn.on('status', inCtx((st: any) => void this.onStatus(id, st)))
+    conn.on('message', inCtx((m: WAMessage, type: string) => {
+      this.onMessage(conn!, m, type).catch((err) => log().error({ err, conn: name, tenant: t.slug }, 'Erro ao processar mensagem recebida'))
+    }))
+    conn.on('receipt', inCtx((waId: string, status: 'sent' | 'delivered' | 'read') => {
       void updateStatusByWaId(id, waId, status).catch(() => {})
-    })
-    this.conns.set(id, conn)
+    }))
+    this.conns.set(k, conn)
+    this.owners.set(k, t)
     return conn
+  }
+
+  /** Pega a lease do número e inicia a conexão. Sem lease (outro processo já segura), não inicia. */
+  private async startConn(id: string, name: string) {
+    const t = currentTenant()
+    if (!(await this.acquireLease(t, id))) {
+      log().warn({ conn: name, tenant: t.slug }, 'Outro processo já está com este número; conexão não iniciada aqui')
+      return this.ensure(id, name)
+    }
+    const conn = this.ensure(id, name)
+    await conn.start()
+    return conn
+  }
+
+  private async acquireLease(t: TenantCtx, connectionId: string): Promise<boolean> {
+    const r = await withPlatform(() =>
+      one<{ holder: string }>(
+        `INSERT INTO wa_leases(tenant_id, connection_id, holder, expires_at) VALUES ($1,$2,$3, now() + make_interval(secs => $4))
+         ON CONFLICT (tenant_id, connection_id) DO UPDATE SET holder=EXCLUDED.holder, expires_at=EXCLUDED.expires_at, updated_at=now()
+           WHERE wa_leases.expires_at < now() OR wa_leases.holder = EXCLUDED.holder
+         RETURNING holder`,
+        [t.id, connectionId, HOLDER, LEASE_SECONDS],
+      ),
+    )
+    return r?.holder === HOLDER
+  }
+
+  private async releaseLease(t: TenantCtx, connectionId: string) {
+    await withPlatform(() => q(`DELETE FROM wa_leases WHERE tenant_id=$1 AND connection_id=$2 AND holder=$3`, [t.id, connectionId, HOLDER])).catch(() => {})
+  }
+
+  /** Renova as leases deste processo; a conexão cuja lease foi perdida é parada (outro processo assumiu). */
+  private startHeartbeat() {
+    if (this.heartbeat) return
+    this.heartbeat = setInterval(() => {
+      void withPlatform(async () => {
+        const kept = await q<{ tenant_id: string; connection_id: string }>(
+          `UPDATE wa_leases SET expires_at = now() + make_interval(secs => $2), updated_at=now() WHERE holder=$1 RETURNING tenant_id, connection_id`,
+          [HOLDER, LEASE_SECONDS],
+        )
+        const alive = new Set(kept.map((r) => `${r.tenant_id}:${r.connection_id}`))
+        for (const [k, conn] of this.conns) {
+          if (conn.status === 'disconnected' || conn.status === 'logged_out' || alive.has(k)) continue
+          const owner = this.owners.get(k)
+          if (!owner) continue
+          log().warn({ conn: conn.name, tenant: owner.slug }, 'Lease do número perdida; parando a conexão neste processo')
+          await runInCtx(owner, () => conn.stop()).catch(() => {})
+        }
+      }).catch((err) => log().error({ err }, 'Falha ao renovar leases do WhatsApp'))
+    }, HEARTBEAT_MS)
+    this.heartbeat.unref()
   }
 
   async connect(id: string) {
     const row = await one<any>(`SELECT id, name FROM connections WHERE id=$1`, [id])
     if (!row) throw new Error('Conexão não encontrada')
-    const conn = this.ensure(row.id, row.name)
-    await conn.start()
-    return conn
+    return this.startConn(row.id, row.name)
   }
 
   async disconnect(id: string) {
-    await this.conns.get(id)?.stop()
+    await this.get(id)?.stop()
+    await this.releaseLease(currentTenant(), id)
   }
 
   async logout(id: string) {
-    const conn = this.conns.get(id) ?? this.ensure(id, id)
+    const conn = this.get(id) ?? this.ensure(id, id)
     await conn.logout()
+    await this.releaseLease(currentTenant(), id)
   }
 
   async remove(id: string) {
-    const conn = this.conns.get(id)
+    const t = currentTenant()
+    const k = this.key(id, t)
+    const conn = this.conns.get(k)
     if (conn) {
       await conn.stop()
-      this.conns.delete(id)
+      this.conns.delete(k)
+      this.owners.delete(k)
     }
+    await this.releaseLease(t, id)
   }
 
   async stopAll() {
-    await Promise.all([...this.conns.values()].map((c) => c.stop()))
+    if (this.heartbeat) clearInterval(this.heartbeat)
+    await Promise.all(
+      [...this.conns.entries()].map(([k, c]) => {
+        const owner = this.owners.get(k)
+        return owner ? runInCtx(owner, async () => {
+          await c.stop()
+          await this.releaseLease(owner, c.id)
+        }) : c.stop()
+      }),
+    )
   }
 
   private async persistStatus(id: string, status: ConnStatus, error: string | null, phone?: string | null, pushName?: string | null) {
@@ -209,9 +312,7 @@ class Manager {
             WHERE id=$1`,
           [conv.id],
         )
-        await q(`UPDATE jobs SET status='done', finished_at=now(), last_error='cancelado: resposta pelo celular' WHERE status='queued' AND group_key=$1`, [
-          `conv:${conv.id}`,
-        ])
+        await cancelGroup(`conv:${conv.id}`, 'resposta pelo celular')
         await q(`UPDATE flow_runs SET status='cancelled', ended_at=now(), error='resposta pelo celular' WHERE conversation_id=$1 AND status IN ('running','waiting')`, [conv.id]).catch(() => {})
         await logEvent(conv.id, 'phone.reply', { type: 'phone' }, { note: 'Resposta enviada pelo celular — automação pausada' })
         await broadcastConversation(conv.id)

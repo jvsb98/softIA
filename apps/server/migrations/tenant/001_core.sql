@@ -1,29 +1,10 @@
 -- =====================================================================
--- Nimber Atende · 001 · Núcleo: acesso, setores, WhatsApp, atendimento
+-- softIA · schema do cliente · 001 · Núcleo: acesso, setores, WhatsApp, atendimento
 -- =====================================================================
 
 -- Gera UUID sem depender de extensão (gen_random_uuid é nativo no PG13+)
 
--- ------------------------------------------------------------ fila de tarefas
-CREATE TABLE jobs (
-  id            bigserial PRIMARY KEY,
-  queue         text        NOT NULL,
-  payload       jsonb       NOT NULL DEFAULT '{}'::jsonb,
-  run_at        timestamptz NOT NULL DEFAULT now(),
-  status        text        NOT NULL DEFAULT 'queued' CHECK (status IN ('queued','running','done','failed')),
-  attempts      int         NOT NULL DEFAULT 0,
-  max_attempts  int         NOT NULL DEFAULT 5,
-  singleton_key text,
-  group_key     text,
-  locked_at     timestamptz,
-  locked_by     text,
-  last_error    text,
-  created_at    timestamptz NOT NULL DEFAULT now(),
-  finished_at   timestamptz
-);
-CREATE UNIQUE INDEX jobs_singleton_uq ON jobs(queue, singleton_key) WHERE status = 'queued' AND singleton_key IS NOT NULL;
-CREATE INDEX jobs_ready_idx   ON jobs(queue, run_at) WHERE status = 'queued';
-CREATE INDEX jobs_running_idx ON jobs(group_key) WHERE status = 'running';
+-- (a fila de tarefas fica no schema plataforma: migrations/platform)
 
 -- ------------------------------------------------------------ configurações gerais
 CREATE TABLE settings (
@@ -273,23 +254,20 @@ CREATE TABLE quick_replies (
 CREATE UNIQUE INDEX quick_replies_shortcut_uq ON quick_replies (lower(shortcut), coalesce(sector_id, '00000000-0000-0000-0000-000000000000'::uuid));
 
 -- ------------------------------------------------------------ dados iniciais
+-- Setores genéricos; o modelo de segmento (marmoraria, clínica, consultório) ajusta na criação do cliente.
 INSERT INTO sectors (name, slug, description, color, sort, offhours_message, hours) VALUES
- ('SDR', 'sdr', 'Primeiro contato e qualificação de leads', '#99C1E4', 1,
-  'Olá! Nosso time comercial atende de segunda a sexta, das 9h às 18h. Sua mensagem foi registrada e um especialista vai continuar seu atendimento no próximo horário útil.',
-  '{"1":[["09:00","18:00"]],"2":[["09:00","18:00"]],"3":[["09:00","18:00"]],"4":[["09:00","18:00"]],"5":[["09:00","18:00"]]}'),
- ('Closer', 'closer', 'Leads qualificados e fechamento', '#FE5A51', 2,
-  'Olá! Nosso time comercial atende de segunda a sexta, das 9h às 18h. Um especialista vai falar com você no próximo horário útil.',
-  '{"1":[["09:00","18:00"]],"2":[["09:00","18:00"]],"3":[["09:00","18:00"]],"4":[["09:00","18:00"]],"5":[["09:00","18:00"]]}'),
- ('Suporte', 'suporte', 'Dúvidas de quem já investe: acesso, rendimentos, resgates', '#7FB685', 3,
-  'Olá! O suporte ao investidor atende de segunda a sexta, das 9h às 18h. Registramos sua mensagem e retornaremos no próximo horário útil.',
-  '{"1":[["09:00","18:00"]],"2":[["09:00","18:00"]],"3":[["09:00","18:00"]],"4":[["09:00","18:00"]],"5":[["09:00","18:00"]]}'),
- ('Jurídico', 'juridico', 'Assuntos jurídicos e reclamações formais', '#C9A227', 4,
-  'Olá! Registramos sua mensagem. Nosso time retornará no próximo horário útil.',
-  '{"1":[["09:00","18:00"]],"2":[["09:00","18:00"]],"3":[["09:00","18:00"]],"4":[["09:00","18:00"]],"5":[["09:00","18:00"]]}');
-UPDATE sectors SET active = false WHERE slug = 'juridico';
+ ('Atendimento', 'atendimento', 'Primeiro contato e dúvidas gerais', '#99C1E4', 1,
+  'Olá! Nosso atendimento funciona de segunda a sexta, das 8h às 18h. Sua mensagem foi registrada e vamos responder no próximo horário útil.',
+  '{"1":[["08:00","18:00"]],"2":[["08:00","18:00"]],"3":[["08:00","18:00"]],"4":[["08:00","18:00"]],"5":[["08:00","18:00"]]}'),
+ ('Comercial', 'comercial', 'Orçamentos, propostas e fechamento', '#FE5A51', 2,
+  'Olá! Nosso time comercial atende de segunda a sexta, das 8h às 18h. Vamos falar com você no próximo horário útil.',
+  '{"1":[["08:00","18:00"]],"2":[["08:00","18:00"]],"3":[["08:00","18:00"]],"4":[["08:00","18:00"]],"5":[["08:00","18:00"]]}'),
+ ('Suporte', 'suporte', 'Quem já é cliente: dúvidas, pós-venda e ajustes', '#7FB685', 3,
+  'Olá! Registramos sua mensagem e retornaremos no próximo horário útil.',
+  '{"1":[["08:00","18:00"]],"2":[["08:00","18:00"]],"3":[["08:00","18:00"]],"4":[["08:00","18:00"]],"5":[["08:00","18:00"]]}');
 
 INSERT INTO settings (key, value) VALUES
- ('org',            '{"name":"Nimber","timezone":"America/Sao_Paulo"}'),
+ ('org',            '{"name":"","timezone":"America/Sao_Paulo"}'),
  ('security',       '{"require2faAdmins":true,"require2faAll":false,"sessionHours":12,"passwordMinLength":10}'),
  ('pacing',         '{"typingCharsPerSecond":18,"typingMinMs":900,"typingMaxMs":6000,"minGapMs":1200,"jitterMs":900,"perMinuteLimit":20}'),
  ('retention',      '{"enabled":false,"anonymizeClosedAfterDays":730,"deleteMediaAfterDays":365}'),

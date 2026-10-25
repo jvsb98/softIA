@@ -1,5 +1,5 @@
 -- =====================================================================
--- Nimber Atende · 003 · Construtor de fluxos
+-- softIA · schema do cliente · 003 · Construtor de fluxos
 -- =====================================================================
 
 CREATE TABLE flows (

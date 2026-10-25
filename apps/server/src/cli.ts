@@ -1,12 +1,16 @@
 /**
  * Utilitários de linha de comando:
- *   npm run cli -- migrate                 aplica migrações
- *   npm run cli -- check                   testa o database.txt e a conexão com o banco
- *   npm run cli -- reset-admin <e-mail>    gera senha temporária e remove o 2FA de um usuário
+ *   npm run cli -- migrate                 aplica migrações (plataforma e todos os clientes)
+ *   npm run cli -- check                   testa a configuração e a conexão com o banco
+ *   npm run cli -- tenant:create <slug> --name "Clínica X" --admin-name "Ana" --admin-email ana@x.com [--segment clinica] [--password ...]
+ *                                          cria um cliente (schema, subdomínio e administrador)
+ *   npm run cli -- tenant:list             lista os clientes
+ *   npm run cli -- tenant:status <slug> <implantacao|ativo|suspenso|cancelado>
+ *   npm run cli -- reset-admin <e-mail> --tenant <slug>   gera senha temporária e remove o 2FA de um usuário
  *   npm run cli -- export-key              mostra a chave-mestra (para migrar de servidor)
  *   npm run cli -- import-key <base64>     grava a chave-mestra trazida de outro servidor
  *   npm run cli -- protect-password        protege a senha do database.txt com DPAPI (Windows)
- *   npm run cli -- seed-demo               cria dados de demonstração (conexão, contatos, conversas)
+ *   npm run cli -- seed-demo --tenant <slug>   cria dados de demonstração num cliente (conexão, contatos, conversas)
  *   npm run cli -- backup --out <pasta> [--keep 14] [--pg-dump <caminho do pg_dump>]
  *                                          cópia do banco (pg_dump formato custom) com rotação
  */
@@ -15,8 +19,9 @@ import { existsSync, mkdirSync, readdirSync, statSync, unlinkSync } from 'node:f
 import { join } from 'node:path'
 import { loadConfig, readMasterKeyPlain, resolveConfigDir, writeMasterKey } from './lib/config.js'
 import { randomToken, setMasterKey } from './lib/crypto.js'
-import { createPool, migrate, one, q } from './lib/db.js'
+import { createPool, migrate, one, q, refreshExtPath } from './lib/db.js'
 import { createLogger } from './lib/logger.js'
+import { withPlatform, withTenant, type TenantCtx } from './lib/tenant.js'
 
 const [cmd, ...args] = process.argv.slice(2)
 
@@ -26,6 +31,7 @@ async function withDb<T>(fn: () => Promise<T>) {
   setMasterKey(cfg.masterKey)
   const pool = createPool(cfg.database)
   try {
+    if (cmd !== 'migrate') await refreshExtPath().catch(() => {})
     return await fn()
   } finally {
     await pool.end()
@@ -35,6 +41,16 @@ async function withDb<T>(fn: () => Promise<T>) {
 function flag(args: string[], name: string): string | undefined {
   const i = args.indexOf(`--${name}`)
   return i >= 0 ? args[i + 1] : undefined
+}
+
+/** Cliente informado em --tenant <slug> (obrigatório para comandos que mexem nos dados de um cliente). */
+async function tenantArg(): Promise<TenantCtx> {
+  const slug = flag(args, 'tenant')
+  if (!slug) throw new Error('Informe o cliente: --tenant <slug>')
+  const { getTenant } = await import('./platform/tenants.js')
+  const t = await getTenant(slug)
+  if (!t) throw new Error(`Cliente "${slug}" não encontrado.`)
+  return t
 }
 
 /** Encontra o pg_dump: --pg-dump, PATH ou instalações padrão do PostgreSQL no Windows (versão mais nova). */
@@ -105,17 +121,19 @@ async function main() {
       console.log(`Pasta de configuração: ${cfg.configDir}`)
       console.log(`Banco: ${cfg.database.user}@${cfg.database.host}:${cfg.database.port}/${cfg.database.database} (SSL: ${cfg.database.ssl})`)
       await withDb(async () => {
-        const r = await one(`SELECT version() AS v, current_database() AS db`)
+        const r = await withPlatform(() => one(`SELECT version() AS v, current_database() AS db`))
         console.log(`Conexão OK — ${r.v}`)
       })
       break
     }
     case 'reset-admin': {
       const email = args[0]
-      if (!email) throw new Error('Informe o e-mail: npm run cli -- reset-admin pessoa@nimber.com.br')
+      if (!email) throw new Error('Informe o e-mail: npm run cli -- reset-admin pessoa@empresa.com.br --tenant <slug>')
       await withDb(async () => {
+        const t = await tenantArg()
+        await withTenant(t, async () => {
         const { hashPassword } = await import('./auth/service.js')
-        const temp = `Nimber-${randomToken(6)}1`
+        const temp = `Temp-${randomToken(6)}1`
         const r = await q(
           `UPDATE users SET password_hash=$2, must_change_password=true, failed_logins=0, locked_until=NULL,
                   totp_enabled=false, totp_secret_enc=NULL, recovery_codes='[]', active=true
@@ -125,6 +143,47 @@ async function main() {
         if (!r.length) throw new Error('Usuário não encontrado.')
         await q(`UPDATE user_sessions SET revoked_at=now() WHERE user_id=$1`, [r[0].id])
         console.log(`Senha temporária de ${email}: ${temp}\nO 2FA foi removido; configure novamente no próximo acesso.`)
+        })
+      })
+      break
+    }
+    case 'tenant:create': {
+      const slug = args[0]
+      const name = flag(args, 'name')
+      const adminName = flag(args, 'admin-name')
+      const adminEmail = flag(args, 'admin-email')
+      if (!slug || !name || !adminName || !adminEmail)
+        throw new Error('Uso: tenant:create <slug> --name "Nome da empresa" --admin-name "Nome" --admin-email email@empresa.com [--segment x] [--password y]')
+      await withDb(async () => {
+        await migrate()
+        const { createTenant } = await import('./platform/tenants.js')
+        const r = await createTenant({ slug, name, adminName, adminEmail, segment: flag(args, 'segment'), adminPassword: flag(args, 'password') })
+        console.log(`Cliente criado: ${r.tenant.name} (${r.tenant.slug}) → schema ${r.tenant.schema}`)
+        console.log(`Endereço: ${r.url}`)
+        console.log(`Administrador: ${r.adminEmail}${r.temporaryPassword ? `  ·  senha temporária: ${r.temporaryPassword}` : ''}`)
+      })
+      break
+    }
+    case 'tenant:list': {
+      await withDb(async () => {
+        const rows = await withPlatform(() =>
+          q<any>(`SELECT t.slug, t.name, t.status, t.schema_name, string_agg(d.hostname, ', ') AS hosts
+                    FROM tenants t LEFT JOIN domains d ON d.tenant_id=t.id GROUP BY t.id ORDER BY t.created_at`),
+        )
+        if (!rows.length) console.log('Nenhum cliente cadastrado.')
+        for (const r of rows) console.log(`${r.slug.padEnd(24)} ${r.status.padEnd(12)} ${r.schema_name.padEnd(28)} ${r.hosts ?? ''}  ${r.name}`)
+      })
+      break
+    }
+    case 'tenant:status': {
+      const [slug, status] = args
+      if (!slug || !['implantacao', 'ativo', 'suspenso', 'cancelado'].includes(status ?? '')) throw new Error('Uso: tenant:status <slug> <implantacao|ativo|suspenso|cancelado>')
+      await withDb(async () => {
+        const { getTenant, setTenantStatus } = await import('./platform/tenants.js')
+        const t = await getTenant(slug)
+        if (!t) throw new Error(`Cliente "${slug}" não encontrado.`)
+        await setTenantStatus(t.id, status as any)
+        console.log(`${slug}: ${t.status} → ${status}. Reinicie o servidor para aplicar às conexões de WhatsApp.`)
       })
       break
     }
@@ -150,14 +209,17 @@ async function main() {
     case 'seed-demo': {
       await withDb(async () => {
         await migrate()
+        const t = await tenantArg()
         const { seedDemo } = await import('./ops/demo.js')
-        const r = await seedDemo()
+        const r = await withTenant(t, () => seedDemo())
         console.log(`Dados de demonstração criados: ${r.conversations} conversas na conexão "${r.connection}".`)
       })
       break
     }
     default:
-      console.log('Comandos: migrate | check | reset-admin <e-mail> | export-key | import-key <base64> | protect-password | backup --out <pasta> [--keep 14] | seed-demo')
+      console.log(
+        'Comandos: migrate | check | tenant:create | tenant:list | tenant:status | reset-admin <e-mail> --tenant <slug> | export-key | import-key <base64> | backup --out <pasta> [--keep 14] | seed-demo --tenant <slug>',
+      )
   }
 }
 
