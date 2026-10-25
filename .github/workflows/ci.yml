@@ -30,7 +30,7 @@ jobs:
       NIMBER_DB_NAME: softia
       NIMBER_DB_USER: softia
       NIMBER_DB_PASSWORD: ci-senha
-      NIMBER_CONFIG_DIR: ${{ runner.temp }}/softia-config
+      NIMBER_CONFIG_DIR: /tmp/softia-config  # (o contexto "runner" não existe no env do job)
       BASE_DOMAIN: localhost
       PUBLIC_URL: http://painel.localhost:8080
     steps:
