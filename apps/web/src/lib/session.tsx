@@ -3,13 +3,17 @@ import { createContext, useContext, useEffect, type ReactNode } from 'react'
 import { api, ApiError } from './api'
 import { resetSocket } from './socket'
 
+export type ModuleKey = 'atendimento' | 'crm' | 'agenda' | 'fluxos' | 'ia' | 'disparo' | 'relatorios' | 'integracoes'
+
 export interface Me {
+  scope: 'tenant' | 'platform'
   user: {
     id: string
     name: string
     email: string
-    role: 'admin' | 'supervisor' | 'agent'
-    permissions: { flowsAdvanced: boolean; flowsEdit: boolean; kbEdit: boolean; reports: boolean }
+    /** cliente: admin, supervisor, agent · painel do fornecedor: admin (super admin), implantador, suporte */
+    role: 'admin' | 'supervisor' | 'agent' | 'implantador' | 'suporte'
+    permissions: { flowsAdvanced: boolean; flowsEdit: boolean; flowsCreate?: boolean; kbEdit: boolean; reports: boolean }
     totp_enabled: boolean
     must_change_password: boolean
     color: string
@@ -18,7 +22,15 @@ export interface Me {
   }
   mfaSetupRequired: boolean
   org: { name: string }
+  /** módulos contratados (só no ambiente do cliente) */
+  modules: Record<ModuleKey, { on: boolean; config: Record<string, any> }> | null
+  limits: Record<string, any> | null
+  /** sessão aberta pela equipe do fornecedor ("entrar como cliente") */
+  impersonation: { byName: string | null; reason: string | null; expiresAt: string } | null
 }
+
+/** Módulo ligado no ambiente atual (no painel do fornecedor, tudo vale). */
+export const moduleOn = (me: Me | null | undefined, key: ModuleKey) => !me?.modules || !!me.modules[key]?.on
 
 type SessionCtx = { me: Me | null; loading: boolean; refresh: () => Promise<unknown>; logout: () => Promise<void> }
 // Sem valor padrão: ler a sessão fora do SessionProvider (ou numa cópia duplicada deste módulo no build)

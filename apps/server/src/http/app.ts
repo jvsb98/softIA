@@ -8,7 +8,7 @@ import rateLimit from '@fastify/rate-limit'
 import fstatic from '@fastify/static'
 import Fastify, { type FastifyInstance, type FastifyReply, type FastifyRequest } from 'fastify'
 import { ZodError } from 'zod'
-import { effectivePermissions, resolveSession, type ResolvedSession, type Role } from '../auth/service.js'
+import { effectivePermissions, resolveSession, type Permissions, type ResolvedSession, type Role } from '../auth/service.js'
 import type { AppConfig } from '../lib/config.js'
 import { log } from '../lib/logger.js'
 import { runInCtx, withPlatform, type ExecCtx } from '../lib/tenant.js'
@@ -61,9 +61,20 @@ export function requirePlatformSession(req: FastifyRequest) {
   return u
 }
 
+/** Permissões do usuário já considerando os módulos contratados e o modo de edição de fluxos do cliente. */
 export function permsOf(req: FastifyRequest) {
   const u = currentUser(req)
-  return effectivePermissions(u.role, u.permissions, isPlatformSession(req))
+  const platform = isPlatformSession(req)
+  const p: Required<Permissions> & { flowsCreate: boolean } = { ...effectivePermissions(u.role, u.permissions, platform), flowsCreate: false }
+  const t = req.execCtx?.kind === 'tenant' ? req.execCtx : null
+  if (t) {
+    const mode = flowEditMode(t)
+    if (!isModuleOn(t, 'fluxos') || (!platform && mode === 'fornecedor')) p.flowsEdit = false
+    p.flowsCreate = p.flowsEdit && (platform || mode === 'cliente_cria')
+    if (!isModuleOn(t, 'ia')) p.kbEdit = false
+    if (!isModuleOn(t, 'relatorios')) p.reports = false
+  }
+  return p
 }
 
 export function requirePermission(req: FastifyRequest, perm: 'flowsAdvanced' | 'flowsEdit' | 'kbEdit' | 'reports') {

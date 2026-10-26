@@ -139,11 +139,11 @@ export async function authRoutes(app: FastifyInstance, secureCookies: boolean) {
     if (!user) {
       user = await one<any>(
         `INSERT INTO users(name, email, password_hash, role, color, platform_user_id)
-         VALUES ($1, $2, $3, 'admin', '#071832', $4) RETURNING id`,
+         VALUES ($1, $2, $3, 'admin', '#64748B', $4) RETURNING id`,
         [`${tk.name} (fornecedor)`, `fornecedor+${tk.platform_user_id}@acesso.invalid`, await hashPassword(randomToken(32)), tk.platform_user_id],
       )
     } else {
-      await q(`UPDATE users SET name=$2, active=true, role='admin' WHERE id=$1`, [user.id, `${tk.name} (fornecedor)`])
+      await q(`UPDATE users SET name=$2, active=true, role='admin', color='#64748B' WHERE id=$1`, [user.id, `${tk.name} (fornecedor)`])
     }
     const sessionToken = await createSession(user.id, false, clientIp(req), req.headers['user-agent'])
     await q(

@@ -60,6 +60,8 @@ jobs:
           test "$(curl -s -o /dev/null -w '%{http_code}' -H 'Host: nao-existe.localhost' http://localhost:8080/api/setup/status)" = "404"
           # dois clientes de teste: nenhum dado nem evento de um aparece no outro
           BASE_URL=http://127.0.0.1:8080 node scripts/test-isolation.mjs
+          # painel do fornecedor: 2FA, criação de cliente, módulos, limites, marca, acesso do fornecedor
+          BASE_URL=http://127.0.0.1:8080 BASE_DOMAIN=localhost node scripts/test-platform.mjs
           # a página do cliente abre
           node dist/cli.js tenant:list
           curl -sf -H 'Host: iso-a.localhost' http://localhost:8080/ | grep -qi "<!doctype html"
