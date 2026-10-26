@@ -13,11 +13,19 @@ Todas as mudanças relevantes do softIA. Formato baseado em [Keep a Changelog](h
 - Provedores e modelos de IA únicos da plataforma, com consumo registrado por cliente (`plataforma.ai_usage`).
 - White label: nome do produto, cor principal e logo (PNG, JPG ou WEBP, até 300 KB) aplicados no login, no título e no ícone da aba do cliente. `PLATFORM_BRAND_NAME` para o nome do painel.
 - Entrar como cliente: token de uso único (60 s), sessão de até 2 horas com faixa "Acesso do fornecedor", usuário técnico que não aparece nem conta no limite do cliente, registro nas auditorias do cliente e da plataforma.
-- Teste ponta a ponta do painel (`apps/server/scripts/test-platform.mjs`, 42 verificações), rodando no CI.
+- Teste ponta a ponta do painel (`apps/server/scripts/test-platform.mjs`, 53 verificações), rodando no CI.
 
 ### Alterado
 - Consulta a bancos externos, compliance e nós avançados de fluxo ficam só com a equipe do fornecedor.
 - Rotas separadas por hostname: as da plataforma não respondem em subdomínio de cliente e vice-versa; a origem precisa ser o próprio hostname.
+
+### Segurança (revisão independente da Fase 2)
+- As regras de rota olham o caminho decodificado: `/api/%66lows` não escapa mais das travas de módulo, de fluxos e do que é só do fornecedor; as rotas sensíveis conferem também dentro do próprio handler.
+- Módulo Integrações desligado para webhooks e alertas do Slack já cadastrados.
+- Pessoa da equipe desativada perde na hora o acesso aberto em um cliente.
+- Logo conferido pelo conteúdo (PNG, JPEG, WEBP) e cortado em 300 KB na leitura.
+- Usuário técnico fora de relatórios, menções e atribuição; conferência de limite em fila por cliente.
+- Marca pode voltar ao padrão; módulos salvos todos ou nenhum; e-mail repetido na equipe responde com mensagem; Auditoria do painel só para o super admin.
 
 ## [0.1.0] — 2026-10-25 · Fase 1: fundação multi-cliente
 

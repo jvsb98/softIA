@@ -14,7 +14,7 @@ import { log } from '../lib/logger.js'
 import { runInCtx, withPlatform, type ExecCtx } from '../lib/tenant.js'
 import { normalizeHost, resolveHost } from '../platform/tenants.js'
 import { flowEditMode, isModuleOn, MODULES, type ModuleKey } from '../platform/modules.js'
-import { forbidden, HttpError, unauthorized } from './errors.js'
+import { badRequest, forbidden, HttpError, unauthorized } from './errors.js'
 
 declare module 'fastify' {
   interface FastifyRequest {
@@ -77,7 +77,7 @@ export function permsOf(req: FastifyRequest) {
   return p
 }
 
-export function requirePermission(req: FastifyRequest, perm: 'flowsAdvanced' | 'flowsEdit' | 'kbEdit' | 'reports') {
+export function requirePermission(req: FastifyRequest, perm: 'flowsAdvanced' | 'flowsEdit' | 'flowsCreate' | 'kbEdit' | 'reports') {
   const u = currentUser(req)
   if (!permsOf(req)[perm]) throw forbidden()
   return u
@@ -118,6 +118,16 @@ function gate(req: FastifyRequest, path: string) {
     if (key === 'compliance') return void requirePlatformSession(req)
     if (key === 'ai' || key === 'qualification' || key === 'handoff') return need('ia')
     if (key === 'notifications') return need('integracoes')
+  }
+}
+
+/** Caminho da URL sem a query, decodificado (null se a codificação for inválida). */
+export function decodedPath(url: string): string | null {
+  const raw = url.split('?')[0] ?? ''
+  try {
+    return decodeURIComponent(raw)
+  } catch {
+    return null
   }
 }
 
@@ -232,7 +242,11 @@ export async function buildApp(cfg: AppConfig): Promise<FastifyInstance> {
 
   // Sessão + proteção CSRF (verificação de Origin em métodos de escrita)
   app.addHook('onRequest', async (req) => {
-    if (!req.url.startsWith('/api/')) return
+    // As regras abaixo olham o caminho JÁ decodificado, igual ao que o roteador usa para achar a rota:
+    // "/api/%66lows" chega ao mesmo handler que "/api/flows" e não pode escapar das verificações.
+    const path = decodedPath(req.url)
+    if (path === null) throw badRequest('Endereço inválido.')
+    if (!path.startsWith('/api/')) return
     if (!['GET', 'HEAD', 'OPTIONS'].includes(req.method)) {
       const origin = req.headers.origin as string | undefined
       if (origin) {
@@ -250,7 +264,6 @@ export async function buildApp(cfg: AppConfig): Promise<FastifyInstance> {
         }
       }
     }
-    const path = req.url.split('?')[0] ?? ''
     if (HOSTLESS_PATHS.includes(path)) return
     // Cada hostname só atende as rotas do seu lado: painel do fornecedor x ambiente do cliente
     if (req.execCtx?.kind === 'platform') {

@@ -69,6 +69,30 @@ function request(method, path, { host = PANEL, cookie, body, raw } = {}) {
   })
 }
 
+function upload(path, cookie, filename, mime, content) {
+  const boundary = `----softia${Date.now()}`
+  const head = Buffer.from(`--${boundary}\r\nContent-Disposition: form-data; name="file"; filename="${filename}"\r\nContent-Type: ${mime}\r\n\r\n`)
+  const body = Buffer.concat([head, content, Buffer.from(`\r\n--${boundary}--\r\n`)])
+  const hostHeader = `${PANEL}${BASE.port ? `:${BASE.port}` : ''}`
+  return new Promise((resolve, reject) => {
+    const req = http.request(
+      {
+        hostname: BASE.hostname,
+        port: BASE.port || 80,
+        method: 'POST',
+        path,
+        headers: { host: hostHeader, cookie, origin: `http://${hostHeader}`, 'content-type': `multipart/form-data; boundary=${boundary}`, 'content-length': body.length },
+      },
+      (res) => {
+        res.resume()
+        res.on('end', () => resolve({ status: res.statusCode }))
+      },
+    )
+    req.on('error', reject)
+    req.end(body)
+  })
+}
+
 const cli = (...a) => execFileSync('node', ['dist/cli.js', ...a], { cwd: root, encoding: 'utf8', env: process.env })
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms))
 
@@ -129,6 +153,12 @@ async function main() {
     'consulta a banco externo fica só com o fornecedor',
   )
   check((await request('PUT', '/api/settings/compliance', { host: TH, cookie: tc, body: { guardEnabled: true } })).status === 403, 'compliance fica só com o fornecedor')
+  // Caminho com letras codificadas (%66 = f) chega ao mesmo handler: as regras valem igual
+  check((await request('POST', '/api/integrations/%64atabases', { host: TH, cookie: tc, body: { name: 'x' } })).status === 403, 'caminho codificado não escapa da trava de banco externo')
+  check((await request('PUT', '/api/settings/%63ompliance', { host: TH, cookie: tc, body: { guardEnabled: true } })).status === 403, 'caminho codificado não escapa da trava de compliance')
+  check((await request('POST', '/api/%66lows', { host: TH, cookie: tc, body: { name: 'Teste' } })).status === 403, 'caminho codificado não escapa do modo de edição de fluxos')
+  check((await request('GET', '/api/integrations/%77ebhooks', { host: TH, cookie: tc })).status === 403, 'caminho codificado não escapa do módulo Integrações')
+  check((await request('GET', '/%61pi/platform/tenants', { host: TH, cookie: tc })).status === 404, 'caminho codificado não abre rota do painel no cliente')
   const c1 = await request('POST', '/api/connections', { host: TH, cookie: tc, body: { name: 'Número 1' } })
   const c2 = await request('POST', '/api/connections', { host: TH, cookie: tc, body: { name: 'Número 2' } })
   check(c1.status === 200 && c2.status === 400, 'limite de números de WhatsApp do plano (1) conferido')
@@ -151,6 +181,14 @@ async function main() {
   const brand = await request('GET', '/api/brand', { host: TH })
   check(brand.json?.productName === 'Atende Pedra' && brand.json?.primaryColor === '#1D4ED8', 'marca do cliente aplicada no subdomínio dele')
   check((await request('GET', '/api/brand')).json?.scope === 'platform', 'painel tem a marca do fornecedor')
+  const fake = await upload(`/api/platform/tenants/${tenantId}/brand/logo`, pc, 'logo.png', 'image/png', Buffer.from('<svg xmlns="http://www.w3.org/2000/svg"><script>alert(1)</script></svg>'))
+  check(fake.status === 400, 'logo falso (SVG com tipo PNG) é recusado pelo conteúdo')
+  const png = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==', 'base64')
+  check((await upload(`/api/platform/tenants/${tenantId}/brand/logo`, pc, 'logo.png', 'image/png', png)).status === 200, 'logo PNG de verdade é aceito')
+  await request('PUT', `/api/platform/tenants/${tenantId}/brand`, { cookie: pc, body: { productName: '', primaryColor: '' } })
+  await sleep(300)
+  const cleared = await request('GET', '/api/brand', { host: TH })
+  check(cleared.json?.productName === 'Marmoraria Teste' && !cleared.json?.primaryColor, 'marca limpa volta ao nome da empresa e à cor padrão')
 
   // ---------------------------------------------------------------- escopo das rotas
   check((await request('GET', '/api/platform/tenants', { host: TH, cookie: tc })).status === 404, 'rota do painel não existe no hostname do cliente')
@@ -188,6 +226,13 @@ async function main() {
   check(supCreate.status === 403, 'suporte não cria clientes')
   const supStatus = await request('POST', `/api/platform/tenants/${tenantId}/status`, { cookie: sl.cookie, body: { status: 'suspenso' } })
   check(supStatus.status === 403, 'suporte não suspende clientes')
+  const supImp = await request('POST', `/api/platform/tenants/${tenantId}/impersonate`, { cookie: sl.cookie, body: { reason: 'Cliente pediu ajuda' } })
+  const supGo = await request('GET', new URL(supImp.json.url).pathname + new URL(supImp.json.url).search, { host: TH })
+  check((await request('GET', '/api/auth/me', { host: TH, cookie: supGo.cookie })).status === 200, 'suporte entra no cliente informando o motivo')
+  const dup = await request('PUT', `/api/platform/team/${sup.json.id}`, { cookie: pc, body: { name: 'Suporte Teste', email: ADMIN.email, role: 'suporte', active: true } })
+  check(dup.status === 400, 'e-mail repetido na equipe é recusado com mensagem')
+  await request('PUT', `/api/platform/team/${sup.json.id}`, { cookie: pc, body: { name: 'Suporte Teste', email: `sup-${STAMP}@fornecedor.test`, role: 'suporte', active: false } })
+  check((await request('GET', '/api/auth/me', { host: TH, cookie: supGo.cookie })).status === 401, 'pessoa desativada perde na hora o acesso que tinha aberto no cliente')
 
   // ---------------------------------------------------------------- situação
   await request('POST', `/api/platform/tenants/${tenantId}/status`, { cookie: pc, body: { status: 'suspenso' } })

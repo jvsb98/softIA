@@ -44,7 +44,7 @@ export async function flowRoutes(app: FastifyInstance) {
   })
 
   app.post('/api/flows', async (req) => {
-    const me = requirePermission(req, 'flowsEdit')
+    const me = requirePermission(req, 'flowsCreate')
     const b = z.object({ name: z.string().min(2).max(80), description: z.string().max(300).optional(), templateId: z.string().optional() }).parse(req.body)
     let draft: FlowDefinition = { nodes: [{ id: 'start', type: 'start', position: { x: 0, y: 0 }, data: {} }], edges: [] }
     if (b.templateId) {
@@ -159,7 +159,7 @@ export async function flowRoutes(app: FastifyInstance) {
   })
 
   app.post('/api/flows/:id/duplicate', async (req) => {
-    const me = requirePermission(req, 'flowsEdit')
+    const me = requirePermission(req, 'flowsCreate')
     const { id } = z.object({ id: uuid }).parse(req.params)
     const f = await one<any>(`SELECT name, description, draft FROM flows WHERE id=$1`, [id])
     if (!f) throw notFound()

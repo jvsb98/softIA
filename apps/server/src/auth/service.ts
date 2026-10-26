@@ -100,7 +100,9 @@ export async function resolveSession(token: string | undefined): Promise<Resolve
   const id = sha256(token)
   const s = await one<any>(
     `SELECT id, user_id, mfa_pending, expires_at, impersonated_by, impersonated_by_name, impersonation_reason
-       FROM user_sessions WHERE id=$1 AND revoked_at IS NULL AND expires_at > now()`,
+       FROM user_sessions WHERE id=$1 AND revoked_at IS NULL AND expires_at > now()
+        -- acesso do fornecedor: cai na hora se a pessoa da equipe for desativada
+        AND (impersonated_by IS NULL OR EXISTS (SELECT 1 FROM plataforma.users pu WHERE pu.id = user_sessions.impersonated_by AND pu.active))`,
     [id],
   )
   if (!s) return null

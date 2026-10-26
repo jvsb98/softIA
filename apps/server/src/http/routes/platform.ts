@@ -11,7 +11,7 @@ import { z } from 'zod'
 import { checkPasswordPolicy, disableTotp, hashPassword, revokeAllSessions } from '../../auth/service.js'
 import { randomToken, sha256 } from '../../lib/crypto.js'
 import { loadConfig } from '../../lib/config.js'
-import { one, q } from '../../lib/db.js'
+import { one, q, tx } from '../../lib/db.js'
 import { tenantOrNull, withPlatform, withTenant, type TenantCtx } from '../../lib/tenant.js'
 import { audit } from '../../ops/audit.js'
 import { publishPlatformEvent } from '../../platform/events.js'
@@ -49,6 +49,14 @@ const limitsBody = z.object({
   aiOverage: z.enum(['bloquear', 'avisar']),
 })
 const brandBody = z.object({ productName: z.string().trim().max(40).optional().or(z.literal('')), primaryColor: color.optional().or(z.literal('')) })
+
+/** Tipo real da imagem pelos primeiros bytes (PNG, JPEG ou WEBP). */
+function imageMime(b: Buffer): string | null {
+  if (b.length > 8 && b.subarray(0, 8).equals(Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]))) return 'image/png'
+  if (b.length > 3 && b[0] === 0xff && b[1] === 0xd8 && b[2] === 0xff) return 'image/jpeg'
+  if (b.length > 12 && b.toString('ascii', 0, 4) === 'RIFF' && b.toString('ascii', 8, 12) === 'WEBP') return 'image/webp'
+  return null
+}
 
 /** Linha do cliente com dados de plataforma (para telas). */
 async function tenantRow(id: string) {
@@ -254,20 +262,26 @@ export async function platformRoutes(app: FastifyInstance) {
     const { id } = z.object({ id: uuid }).parse(req.params)
     const b = z.object({ modules: z.record(z.string(), moduleState) }).parse(req.body)
     if (!(await tenantRow(id))) throw notFound()
-    const changedKeys: string[] = []
-    await withPlatform(async () => {
-      for (const [key, m] of Object.entries(b.modules)) {
-        const def = MODULES.find((x) => x.key === key)
-        if (!def || def.base) continue
-        if (key === 'fluxos' && m.config.edicao && !['fornecedor', 'cliente_edita', 'cliente_cria'].includes(m.config.edicao)) throw badRequest('Modo de edição de fluxos inválido.')
-        await q(
-          `INSERT INTO tenant_modules(tenant_id, module, enabled, config, updated_by) VALUES ($1,$2,$3,$4,$5)
-           ON CONFLICT (tenant_id, module) DO UPDATE SET enabled=EXCLUDED.enabled, config=EXCLUDED.config, updated_by=EXCLUDED.updated_by, updated_at=now()`,
-          [id, key, m.enabled, JSON.stringify(m.config ?? {}), me.id],
-        )
-        changedKeys.push(`${key}:${m.enabled ? 'on' : 'off'}`)
-      }
+    // Valida tudo antes de gravar: ou salva todos os módulos, ou nenhum
+    const entries = Object.entries(b.modules).filter(([key]) => {
+      const def = MODULES.find((x) => x.key === key)
+      return def && !def.base
     })
+    for (const [key, m] of entries) {
+      if (key === 'fluxos' && m.config?.edicao && !['fornecedor', 'cliente_edita', 'cliente_cria'].includes(m.config.edicao)) throw badRequest('Modo de edição de fluxos inválido.')
+    }
+    const changedKeys = entries.map(([key, m]) => `${key}:${m.enabled ? 'on' : 'off'}`)
+    await withPlatform(() =>
+      tx(async (c) => {
+        for (const [key, m] of entries) {
+          await c.query(
+            `INSERT INTO tenant_modules(tenant_id, module, enabled, config, updated_by) VALUES ($1,$2,$3,$4,$5)
+             ON CONFLICT (tenant_id, module) DO UPDATE SET enabled=EXCLUDED.enabled, config=EXCLUDED.config, updated_by=EXCLUDED.updated_by, updated_at=now()`,
+            [id, key, m.enabled, JSON.stringify(m.config ?? {}), me.id],
+          )
+        }
+      }),
+    )
     await changed(id)
     await audit({ userId: me.id, action: 'cliente.modulos_alterados', entity: 'tenant', entityId: id, data: { modulos: changedKeys }, ip: clientIp(req) })
     return { ok: true }
@@ -287,8 +301,15 @@ export async function platformRoutes(app: FastifyInstance) {
     const me = requireStaff(req, 'admin', 'implantador')
     const { id } = z.object({ id: uuid }).parse(req.params)
     const b = brandBody.parse(req.body)
-    const brand = { productName: b.productName || undefined, primaryColor: b.primaryColor || undefined }
-    await withPlatform(() => q(`UPDATE tenants SET brand = brand || $2::jsonb, updated_at=now() WHERE id=$1`, [id, JSON.stringify(brand)]))
+    // Campo vazio volta ao padrão (nome da empresa / cor padrão): a chave sai do objeto
+    const brand = { productName: b.productName || null, primaryColor: b.primaryColor || null }
+    await withPlatform(() =>
+      q(`UPDATE tenants SET brand = (coalesce(brand, '{}'::jsonb) - 'productName' - 'primaryColor') || jsonb_strip_nulls($2::jsonb), updated_at=now() WHERE id=$1`, [
+        id,
+        JSON.stringify(brand),
+      ]),
+    )
+    await changed(id)
     await audit({ userId: me.id, action: 'cliente.marca_alterada', entity: 'tenant', entityId: id, data: brand, ip: clientIp(req) })
     return { ok: true }
   })
@@ -296,17 +317,23 @@ export async function platformRoutes(app: FastifyInstance) {
   app.post('/api/platform/tenants/:id/brand/logo', async (req) => {
     const me = requireStaff(req, 'admin', 'implantador')
     const { id } = z.object({ id: uuid }).parse(req.params)
-    const file = await (req as any).file()
+    const file = await (req as any).file({ limits: { fileSize: 300 * 1024 + 1 } })
     if (!file) throw badRequest('Envie a imagem do logo.')
-    // Só imagens de bitmap: SVG pode carregar script
-    if (!['image/png', 'image/jpeg', 'image/webp'].includes(file.mimetype)) throw badRequest('Use PNG, JPG ou WEBP.')
-    const buf: Buffer = await file.toBuffer()
-    if (buf.length > 300 * 1024) throw badRequest('O logo pode ter no máximo 300 KB.')
+    let buf: Buffer
+    try {
+      buf = await file.toBuffer()
+    } catch {
+      throw badRequest('O logo pode ter no máximo 300 KB.')
+    }
+    if (file.file?.truncated || buf.length > 300 * 1024) throw badRequest('O logo pode ter no máximo 300 KB.')
+    // Só imagens de bitmap (SVG pode carregar script), conferidas pelo conteúdo e não pelo tipo que o navegador informa
+    const mime = imageMime(buf)
+    if (!mime) throw badRequest('Use PNG, JPG ou WEBP.')
     await withPlatform(async () => {
       await q(
         `INSERT INTO brand_assets(tenant_id, kind, mime, data) VALUES ($1,'logo',$2,$3)
          ON CONFLICT (tenant_id, kind) DO UPDATE SET mime=EXCLUDED.mime, data=EXCLUDED.data, updated_at=now()`,
-        [id, file.mimetype, buf],
+        [id, mime, buf],
       )
       await q(`UPDATE tenants SET updated_at=now() WHERE id=$1`, [id])
     })
@@ -391,6 +418,7 @@ export async function platformRoutes(app: FastifyInstance) {
     const { id } = z.object({ id: uuid }).parse(req.params)
     const b = teamBody.parse(req.body)
     if (id === me.id && (b.role !== 'admin' || !b.active)) throw badRequest('Você não pode remover o seu próprio acesso de super admin.')
+    if (await one(`SELECT 1 FROM users WHERE lower(email)=lower($1) AND id<>$2`, [b.email, id])) throw badRequest('Já existe alguém com este e-mail.')
     await q(`UPDATE users SET name=$2, email=lower($3), role=$4, active=$5, updated_at=now() WHERE id=$1`, [id, b.name, b.email, b.role, b.active])
     if (!b.active) await revokeAllSessions(id)
     await audit({ userId: me.id, action: 'equipe.alterado', entity: 'user', entityId: id, data: { perfil: b.role, ativo: b.active }, ip: clientIp(req) })

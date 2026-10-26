@@ -28,7 +28,7 @@ export function PlatformApp() {
         <Route path="/clientes/:id" element={<ClientPage />} />
         <Route path="/equipe" element={<TeamPage />} />
         {isAdmin && <Route path="/ia" element={<Page><AiProvidersSettings /></Page>} />}
-        <Route path="/auditoria" element={<Page><AuditSettings /></Page>} />
+        {isAdmin && <Route path="/auditoria" element={<Page><AuditSettings /></Page>} />}
         <Route path="/perfil" element={<Page><ProfileSettings /></Page>} />
         <Route path="*" element={<Navigate to="/clientes" replace />} />
       </Route>
@@ -47,7 +47,7 @@ function PlatformShell() {
     { to: '/clientes', label: 'Clientes', icon: Building2 },
     { to: '/equipe', label: 'Equipe', icon: UsersRound },
     { to: '/ia', label: 'IA (provedores e modelos)', icon: Cpu, show: me.user.role === 'admin' },
-    { to: '/auditoria', label: 'Auditoria', icon: ScrollText },
+    { to: '/auditoria', label: 'Auditoria', icon: ScrollText, show: me.user.role === 'admin' },
     { to: '/perfil', label: 'Meu perfil e 2FA', icon: UserCog },
   ]
   return (

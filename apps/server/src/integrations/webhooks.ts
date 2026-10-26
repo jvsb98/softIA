@@ -7,6 +7,8 @@ import { one, q } from '../lib/db.js'
 import { enqueue, work, type Job } from '../lib/jobs.js'
 import { log } from '../lib/logger.js'
 import { safeFetch } from '../lib/net-guard.js'
+import { tenantOrNull } from '../lib/tenant.js'
+import { isModuleOn } from '../platform/modules.js'
 
 export const WEBHOOK_EVENTS: Record<string, string> = {
   'lead.qualified': 'Lead qualificado (com score e respostas)',
@@ -50,6 +52,8 @@ async function enrich(event: string, data: Record<string, any>) {
 }
 
 export async function fireEvent(event: string, data: Record<string, unknown>) {
+  // Módulo Integrações desligado: nada sai do sistema, mesmo com webhooks cadastrados
+  if (!isModuleOn(tenantOrNull(), 'integracoes')) return
   try {
     const hooks = await q<any>(`SELECT id FROM webhooks WHERE enabled AND ($1 = ANY(events) OR '*' = ANY(events))`, [event])
     if (!hooks.length) return
@@ -66,6 +70,7 @@ export async function fireEvent(event: string, data: Record<string, unknown>) {
 async function deliver(job: Job<{ deliveryId: number }>) {
   const d = await one<any>(`SELECT d.*, w.url, w.secret, w.enabled FROM webhook_deliveries d JOIN webhooks w ON w.id=d.webhook_id WHERE d.id=$1`, [job.payload.deliveryId])
   if (!d || !d.enabled || d.status === 'delivered') return
+  if (!isModuleOn(tenantOrNull(), 'integracoes')) return
   const body = JSON.stringify(d.payload)
   let code: number | null = null
   try {

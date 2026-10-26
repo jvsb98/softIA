@@ -8,11 +8,11 @@ import { describeHours } from '../../ops/hours.js'
 import { allSettings, setSetting } from '../../ops/settings.js'
 import { manager } from '../../whatsapp/manager.js'
 import { emitStaff } from '../realtime.js'
-import { badRequest, notFound } from '../errors.js'
-import { clientIp, currentUser, requireRole } from '../app.js'
+import { badRequest, forbidden, notFound } from '../errors.js'
+import { clientIp, currentUser, requirePlatformSession, requireRole } from '../app.js'
 import { jobStats } from '../../lib/jobs.js'
-import { tenantOrNull } from '../../lib/tenant.js'
-import { limitsOf } from '../../platform/modules.js'
+import { ctxKey, tenantOrNull } from '../../lib/tenant.js'
+import { isModuleOn, limitsOf } from '../../platform/modules.js'
 
 const uuid = z.string().uuid()
 const hoursSchema = z.record(z.string().regex(/^[0-6]$/), z.array(z.tuple([z.string().regex(/^\d{2}:\d{2}$/), z.string().regex(/^\d{2}:\d{2}$/)])))
@@ -22,6 +22,22 @@ async function assertUserLimit() {
   const max = limitsOf(tenantOrNull()).maxUsers
   const n = await one<{ n: number }>(`SELECT count(*)::int AS n FROM users WHERE active AND platform_user_id IS NULL`)
   if ((n?.n ?? 0) >= max) throw badRequest(`Seu plano permite ${max} usuário(s) ativo(s). Fale com o fornecedor para aumentar.`)
+}
+
+/**
+ * Conferência de limite + gravação em fila, por cliente: duas requisições ao mesmo tempo não passam juntas do limite.
+ * Vale para um processo (a implantação atual); com vários processos, trocar por pg_advisory_xact_lock numa transação.
+ */
+const limitQueues = new Map<string, Promise<unknown>>()
+function limited<A extends any[], T>(kind: string, fn: (...a: A) => Promise<T>) {
+  return (...a: A): Promise<T> => {
+    const key = `${ctxKey()}:${kind}`
+    const run = (limitQueues.get(key) ?? Promise.resolve()).catch(() => {}).then(() => fn(...a))
+    const tail = run.catch(() => {})
+    limitQueues.set(key, tail)
+    void tail.then(() => limitQueues.get(key) === tail && limitQueues.delete(key))
+    return run
+  }
 }
 
 export async function adminRoutes(app: FastifyInstance) {
@@ -50,7 +66,7 @@ export async function adminRoutes(app: FastifyInstance) {
     color: z.string().max(9).optional(),
   })
 
-  app.post('/api/users', async (req) => {
+  app.post('/api/users', limited('users', async (req) => {
     const me = requireRole(req, 'admin')
     const body = userBody.extend({ password: z.string().optional() }).parse(req.body)
     const exists = await one(`SELECT 1 FROM users WHERE lower(email)=lower($1)`, [body.email])
@@ -67,9 +83,9 @@ export async function adminRoutes(app: FastifyInstance) {
     for (const sid of body.sectorIds) await q(`INSERT INTO sector_members VALUES ($1,$2) ON CONFLICT DO NOTHING`, [sid, u.id])
     await audit({ userId: me.id, action: 'user.created', entity: 'user', entityId: u.id, data: { email: body.email, role: body.role }, ip: clientIp(req) })
     return { id: u.id, temporaryPassword: body.password ? undefined : temp }
-  })
+  }))
 
-  app.put('/api/users/:id', async (req) => {
+  app.put('/api/users/:id', limited('users', async (req) => {
     const me = requireRole(req, 'admin')
     const { id } = z.object({ id: uuid }).parse(req.params)
     const body = userBody.parse(req.body)
@@ -87,7 +103,7 @@ export async function adminRoutes(app: FastifyInstance) {
     await audit({ userId: me.id, action: 'user.updated', entity: 'user', entityId: id, data: { role: body.role, active: body.active }, ip: clientIp(req) })
     emitStaff('user:changed', { id })
     return { ok: true }
-  })
+  }))
 
   app.post('/api/users/:id/reset-password', async (req) => {
     const me = requireRole(req, 'admin')
@@ -199,7 +215,7 @@ export async function adminRoutes(app: FastifyInstance) {
     settings: z.record(z.string(), z.any()).default({}),
   })
 
-  app.post('/api/connections', async (req) => {
+  app.post('/api/connections', limited('connections', async (req) => {
     const me = requireRole(req, 'admin')
     const b = connBody.parse(req.body)
     const max = limitsOf(tenantOrNull()).maxConnections
@@ -212,7 +228,7 @@ export async function adminRoutes(app: FastifyInstance) {
     if (b.entryFlowId !== undefined) await q(`UPDATE connections SET entry_flow_id=$2 WHERE id=$1`, [c.id, b.entryFlowId]).catch(() => {})
     await audit({ userId: me.id, action: 'connection.created', entity: 'connection', entityId: c.id, data: { name: b.name }, ip: clientIp(req) })
     return { id: c.id }
-  })
+  }))
 
   app.put('/api/connections/:id', async (req) => {
     const me = requireRole(req, 'admin')
@@ -330,6 +346,13 @@ export async function adminRoutes(app: FastifyInstance) {
   app.put('/api/settings/:key', async (req) => {
     const me = requireRole(req, 'admin')
     const { key } = z.object({ key: z.enum(EDITABLE) }).parse(req.params)
+    // Mesmo controle do portão (gate) no app.ts, repetido aqui por segurança
+    const t = tenantOrNull()
+    if (t) {
+      if (key === 'compliance') requirePlatformSession(req)
+      if ((key === 'ai' || key === 'qualification' || key === 'handoff') && !isModuleOn(t, 'ia')) throw forbidden('Módulo não contratado: IA.')
+      if (key === 'notifications' && !isModuleOn(t, 'integracoes')) throw forbidden('Módulo não contratado: Integrações.')
+    }
     const value = z.record(z.string(), z.any()).parse(req.body)
     await setSetting(key, value, me.id)
     await audit({ userId: me.id, action: 'settings.updated', entity: 'settings', entityId: key, data: { keys: Object.keys(value) }, ip: clientIp(req) })
