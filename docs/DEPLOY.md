@@ -74,16 +74,19 @@ O Caddy da Central passa a importar trechos de outros sistemas da pasta `/opt/ca
 
 ```bash
 mkdir -p /opt/softia /opt/caddy-extra && cd /opt/softia
-# arquivos do repositório: deploy/docker/docker-compose.yml, docker-compose.compartilhado.yml, .env.example
-curl -fsSLO https://raw.githubusercontent.com/jvsb98/softIA/main/deploy/docker/docker-compose.yml   # ou copie com scp
-curl -fsSLO https://raw.githubusercontent.com/jvsb98/softIA/main/deploy/docker/docker-compose.compartilhado.yml
-cp .env.example .env && nano .env      # BASE_DOMAIN, PUBLIC_URL, NIMBER_DB_*, NIMBER_MASTER_KEY
+R=https://raw.githubusercontent.com/jvsb98/softIA/main
+curl -fsSLO $R/deploy/docker/docker-compose.yml
+curl -fsSLO $R/deploy/docker/docker-compose.compartilhado.yml
+curl -fsSL  $R/deploy/docker/.env.example -o .env.example
+curl -fsSLO $R/deploy/caddy/softia.global
+curl -fsSLO $R/deploy/caddy/softia.site
+cp .env.example .env && chmod 600 .env && nano .env   # BASE_DOMAIN, PUBLIC_URL, NIMBER_DB_*, NIMBER_MASTER_KEY
 ```
 
-> Repositório privado: o `curl` do GitHub precisa de token. É mais simples copiar os três arquivos com `scp`.
+> Se o repositório virar privado, o `curl` precisa de token. Aí é mais simples copiar os arquivos com `scp`.
 
 - **Chave-mestra:** gere com `openssl rand -base64 32`, coloque em `NIMBER_MASTER_KEY` e guarde uma cópia fora do servidor. Sem ela, os segredos gravados no banco (2FA, chaves de IA) não podem ser lidos.
-- **Imagem:** o GitHub Actions publica `ghcr.io/jvsb98/softia:main` a cada push na `main`. Como o pacote é privado, faça login uma vez no Droplet com um token do GitHub (permissão `read:packages`):
+- **Imagem:** o GitHub Actions publica `ghcr.io/jvsb98/softia:main` a cada push na `main`. Se o `pull` responder `denied` ou `unauthorized`, o pacote está privado: faça login uma vez no Droplet com um token do GitHub (permissão `read:packages`), ou deixe o pacote público em GitHub → Packages → softia → Package settings:
   ```bash
   echo <TOKEN> | docker login ghcr.io -u jvsb98 --password-stdin
   ```
@@ -96,27 +99,37 @@ $C pull && $C up -d
 curl -s http://127.0.0.1:8080/api/health      # {"ok":true,"app":"softia",...}
 
 # Trechos do Caddy (on-demand TLS) e recarga do Caddy da Central
-cp softia.global softia.site /opt/caddy-extra/   # arquivos de deploy/caddy/ do repositório
+cp softia.global softia.site /opt/caddy-extra/
 docker exec central-whatsapp-site-1 caddy reload --config /etc/caddy/Caddyfile
 ```
 
-## 6. Criar um cliente (até o painel da Fase 2)
+## 6. Primeiro acesso ao painel do fornecedor
+
+Crie o seu acesso de super admin (uma vez):
 
 ```bash
 docker compose -f docker-compose.yml -f docker-compose.compartilhado.yml exec softia \
-  node server/dist/cli.js tenant:create alfa --name "Marmoraria Alfa" \
-  --admin-name "Ana" --admin-email ana@alfa.com.br --segment marmoraria
+  node server/dist/cli.js platform:create-admin --name "João Victor" --email ti@nimber.com.br
 ```
 
-A saída mostra o endereço (`https://alfa.connectawork.app.br`) e a senha temporária do administrador, que é trocada no primeiro acesso. Na primeira visita, o Caddy emite o certificado do subdomínio, o que leva alguns segundos.
+A saída mostra uma senha temporária. Abra `https://painel.connectawork.app.br`, entre, crie a sua senha e ative a verificação em duas etapas (obrigatória para toda a equipe do fornecedor; use um aplicativo como Google Authenticator ou Authy).
 
-Outros comandos, sempre com `exec softia node server/dist/cli.js`:
+No painel:
+
+- **Clientes → Novo cliente**: cinco passos (empresa e endereço, marca, módulos e limites, administrador, revisão). No fim aparecem a senha temporária do administrador do cliente e uma mensagem pronta para enviar pelo WhatsApp. Na primeira visita ao subdomínio, o Caddy emite o certificado, o que leva alguns segundos.
+- **Ficha do cliente**: situação dos números, módulos, limites, marca (nome, cor e logo), dados e cobrança, e **Entrar como cliente** (abre o ambiente dele em outra aba, por até 2 horas, registrado na auditoria dos dois lados).
+- **Equipe**: adicione implantadores e suporte. Só o super admin muda a situação de um cliente (suspender, cancelar), mexe na equipe e nos provedores de IA.
+- **IA (provedores e modelos)**: cadastre a chave da plataforma (OpenAI, Anthropic etc.) uma vez; vale para todos os clientes com o módulo IA, cada um com a sua franquia mensal.
+
+Comandos de apoio, sempre com `exec softia node server/dist/cli.js`:
 
 | Comando | O que faz |
 |---|---|
+| `platform:create-admin --name N --email E [--role implantador\|suporte]` | Cria alguém da equipe do fornecedor (padrão: super admin) |
+| `tenant:create alfa --name "Marmoraria Alfa" --admin-name Ana --admin-email ana@alfa.com.br --segment marmoraria` | Cria um cliente sem passar pelo painel |
 | `tenant:list` | Lista os clientes, a situação e os endereços |
 | `tenant:status alfa suspenso` | Suspende, reativa (`ativo`) ou cancela; o servidor para ou retoma as conexões de WhatsApp e as sessões abertas na hora |
-| `reset-admin ana@alfa.com.br --tenant alfa` | Senha temporária e remoção do 2FA de um usuário |
+| `reset-admin ana@alfa.com.br --tenant alfa` | Senha temporária e remoção do 2FA de um usuário do cliente |
 | `migrate` | Aplica migrações (o servidor já faz isso ao subir) |
 
 ## 7. Atualizar

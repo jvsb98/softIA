@@ -248,7 +248,7 @@ export async function migrateTenant(t: TenantCtx, opts: { create?: boolean } = {
 /** Clientes cujo schema deve existir (todos menos os cancelados). */
 export async function listTenantsForMigration(): Promise<TenantCtx[]> {
   return withPlatform(async () => {
-    const rows = await q<any>(`SELECT id, slug, schema_name, name, status FROM tenants WHERE status <> 'cancelado' ORDER BY created_at`)
+    const rows = await q<any>(`SELECT id, slug, schema_name, name, status FROM tenants WHERE status <> 'cancelado' ORDER BY created_at`) // contexto mínimo: só para migrar
     return rows.map((r) => ({ kind: 'tenant' as const, id: r.id, slug: r.slug, schema: r.schema_name, name: r.name, status: r.status }))
   })
 }

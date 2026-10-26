@@ -21,7 +21,10 @@ import { one, q, tx } from '../../lib/db.js'
 import { audit } from '../../ops/audit.js'
 import { getSetting } from '../../ops/settings.js'
 import { badRequest, conflict, unauthorized } from '../errors.js'
-import { clearSessionCookie, clientIp, currentUser, setSessionCookie } from '../app.js'
+import { clearSessionCookie, clientIp, currentUser, permsOf, setSessionCookie } from '../app.js'
+import { randomToken } from '../../lib/crypto.js'
+import { withPlatform } from '../../lib/tenant.js'
+import { limitsOf, modulesView } from '../../platform/modules.js'
 
 export async function authRoutes(app: FastifyInstance, secureCookies: boolean) {
   // ------------------------------------------------------------ primeira instalação
@@ -99,11 +102,57 @@ export async function authRoutes(app: FastifyInstance, secureCookies: boolean) {
     const sec = await getSetting('security', { require2faAdmins: true, require2faAll: false })
     const mustHave2fa = sec.require2faAll || (sec.require2faAdmins && u.role === 'admin')
     const org = await getSetting('org', { name: '' })
+    const imp = req.session?.impersonation ?? null
+    const t = req.execCtx?.kind === 'tenant' ? req.execCtx : null
     return {
-      user: { ...u, permissions: effectivePermissions(u.role, u.permissions) },
-      mfaSetupRequired: mustHave2fa && !u.totp_enabled,
+      scope: t ? 'tenant' : 'platform',
+      user: { ...u, permissions: permsOf(req) },
+      // o acesso do fornecedor já passou pelo 2FA no painel
+      mfaSetupRequired: !imp && mustHave2fa && !u.totp_enabled,
       org,
+      modules: t ? modulesView(t) : null,
+      limits: t ? limitsOf(t) : null,
+      impersonation: imp ? { byName: imp.byName, reason: imp.reason, expiresAt: imp.expiresAt } : null,
     }
+  })
+
+  // ------------------------------------------------------------ "entrar como cliente" (chega do painel do fornecedor)
+  app.get('/api/auth/impersonate', { config: { rateLimit: { max: 20, timeWindow: '1 minute' } } }, async (req, reply) => {
+    const t = req.execCtx?.kind === 'tenant' ? req.execCtx : null
+    const { token } = z.object({ token: z.string().min(20).max(200) }).parse(req.query)
+    if (!t) throw badRequest('Endereço inválido.')
+    // Token de uso único, válido por 60 s e só para ESTE cliente
+    const tk = await withPlatform(() =>
+      one<any>(
+        `UPDATE impersonation_tokens it SET used_at=now()
+          WHERE it.id=$1 AND it.used_at IS NULL AND it.expires_at > now() AND it.tenant_id=$2
+          RETURNING it.platform_user_id, it.reason, (SELECT name FROM users WHERE id=it.platform_user_id) AS name,
+                    (SELECT active FROM users WHERE id=it.platform_user_id) AS active`,
+        [sha256(token), t.id],
+      ),
+    )
+    if (!tk || !tk.active) {
+      return reply.status(403).type('text/html; charset=utf-8').send('<p style="font-family:system-ui;padding:40px">Link de acesso inválido ou expirado. Gere outro no painel do fornecedor.</p>')
+    }
+    // Usuário técnico desta pessoa do fornecedor neste cliente (fica fora das listas e dos limites)
+    let user = await one<any>(`SELECT id FROM users WHERE platform_user_id=$1`, [tk.platform_user_id])
+    if (!user) {
+      user = await one<any>(
+        `INSERT INTO users(name, email, password_hash, role, color, platform_user_id)
+         VALUES ($1, $2, $3, 'admin', '#64748B', $4) RETURNING id`,
+        [`${tk.name} (fornecedor)`, `fornecedor+${tk.platform_user_id}@acesso.invalid`, await hashPassword(randomToken(32)), tk.platform_user_id],
+      )
+    } else {
+      await q(`UPDATE users SET name=$2, active=true, role='admin', color='#64748B' WHERE id=$1`, [user.id, `${tk.name} (fornecedor)`])
+    }
+    const sessionToken = await createSession(user.id, false, clientIp(req), req.headers['user-agent'])
+    await q(
+      `UPDATE user_sessions SET impersonated_by=$2, impersonated_by_name=$3, impersonation_reason=$4, expires_at=now() + interval '2 hours' WHERE id=$1`,
+      [sha256(sessionToken), tk.platform_user_id, tk.name, tk.reason ?? null],
+    )
+    await audit({ userId: user.id, action: 'fornecedor.acesso_iniciado', data: { por: tk.name, motivo: tk.reason ?? null }, ip: clientIp(req) })
+    setSessionCookie(reply, sessionToken, secureCookies)
+    return reply.redirect('/atendimento')
   })
 
   // ------------------------------------------------------------ 2FA (configuração)

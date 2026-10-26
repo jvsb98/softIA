@@ -402,7 +402,7 @@ export async function transfer(
 }
 
 export async function assign(conversationId: string, userId: string, actor: Actor) {
-  const user = await one<any>(`SELECT id, name FROM users WHERE id=$1 AND active`, [userId])
+  const user = await one<any>(`SELECT id, name FROM users WHERE id=$1 AND active AND platform_user_id IS NULL`, [userId])
   if (!user) throw new Error('Atendente não encontrado')
   const conv = await one<ConversationRow>(
     `UPDATE conversations SET status='open', assignee_id=$2, assigned_at=now(), ai_paused=true WHERE id=$1 RETURNING *`,

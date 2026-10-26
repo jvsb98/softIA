@@ -6,9 +6,13 @@ import { toast } from 'sonner'
 import { Badge, Button, cx, Dialog, Empty, Field, IconButton, Input, PageHeader, PixelGlyph, Textarea } from '../../components/ui'
 import { api } from '../../lib/api'
 import { ago } from '../../lib/format'
+import { useSession } from '../../lib/session'
 
 export function FlowsPage() {
   const flows = useQuery({ queryKey: ['flows'], queryFn: () => api.get<any[]>('/api/flows') })
+  const { me } = useSession()
+  const canEdit = !!me?.user.permissions.flowsEdit
+  const canCreate = !!me?.user.permissions.flowsCreate
   const [creating, setCreating] = useState(false)
   const qc = useQueryClient()
   const navigate = useNavigate()
@@ -19,11 +23,18 @@ export function FlowsPage() {
           title="Fluxos de atendimento"
           description="Monte visualmente o caminho das conversas: mensagens, perguntas, menus, agente de IA e transferências. Cada conexão usa um fluxo de entrada."
           actions={
-            <Button variant="primary" icon={<Plus className="size-4" />} onClick={() => setCreating(true)}>
-              Novo fluxo
-            </Button>
+            canCreate && (
+              <Button variant="primary" icon={<Plus className="size-4" />} onClick={() => setCreating(true)}>
+                Novo fluxo
+              </Button>
+            )
           }
         />
+        {!canEdit && (
+          <div className="mb-4 rounded-[10px] border border-line bg-panel-2 px-4 py-3 text-[13px] text-ink-2">
+            Os fluxos deste ambiente são montados e mantidos pela equipe do fornecedor. Você pode abrir, simular e acompanhar as métricas.
+          </div>
+        )}
         {!flows.data?.length ? (
           <div className="rounded-[12px] border border-line bg-panel">
             <Empty
@@ -59,8 +70,8 @@ export function FlowsPage() {
                     <span>editado {ago(f.draft_updated_at)}{f.draft_updated_by_name ? ` por ${f.draft_updated_by_name}` : ''}</span>
                   </div>
                 </button>
-                <div className="mt-3 flex justify-end gap-1 opacity-0 transition-opacity group-hover:opacity-100">
-                  <IconButton
+                <div className={cx('mt-3 flex justify-end gap-1 opacity-0 transition-opacity group-hover:opacity-100', !canEdit && 'hidden')}>
+                  {canCreate && <IconButton
                     label="Duplicar"
                     onClick={async () => {
                       const r = await api.post(`/api/flows/${f.id}/duplicate`)
@@ -69,7 +80,7 @@ export function FlowsPage() {
                     }}
                   >
                     <Copy className="size-4" />
-                  </IconButton>
+                  </IconButton>}
                   <IconButton
                     label={f.archived ? 'Restaurar' : 'Arquivar'}
                     onClick={() =>

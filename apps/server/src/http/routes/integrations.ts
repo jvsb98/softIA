@@ -6,15 +6,29 @@ import { enqueue } from '../../lib/jobs.js'
 import { audit } from '../../ops/audit.js'
 import { executeSavedQuery, guardSql, testDatabase } from '../../integrations/queries.js'
 import { WEBHOOK_EVENTS } from '../../integrations/webhooks.js'
-import { badRequest, notFound } from '../errors.js'
-import { clientIp, currentUser, requireRole } from '../app.js'
+import { badRequest, forbidden, notFound } from '../errors.js'
+import { clientIp, currentUser, requirePlatformSession, requireRole } from '../app.js'
+import type { FastifyRequest } from 'fastify'
+import { isModuleOn } from '../../platform/modules.js'
+import { tenantOrNull } from '../../lib/tenant.js'
+
+/** Bancos externos e consultas: só a equipe do fornecedor (rede interna e SQL arbitrário). */
+function staffAdmin(req: FastifyRequest) {
+  requirePlatformSession(req)
+  return requireRole(req, 'admin')
+}
+
+/** Webhooks dependem do módulo Integrações. */
+function needIntegrations() {
+  if (!isModuleOn(tenantOrNull(), 'integracoes')) throw forbidden('Módulo não contratado: Integrações. Fale com o fornecedor do sistema.')
+}
 
 const uuid = z.string().uuid()
 
 export async function integrationRoutes(app: FastifyInstance) {
   // ============================================================ bases externas
   app.get('/api/integrations/databases', async (req) => {
-    requireRole(req, 'admin')
+    staffAdmin(req)
     const rows = await q<any>(`SELECT id, name, kind, host, port, database, username, ssl, enabled, created_at, password_enc IS NOT NULL AS has_password FROM external_databases ORDER BY name`)
     return rows
   })
@@ -32,7 +46,7 @@ export async function integrationRoutes(app: FastifyInstance) {
   })
 
   app.post('/api/integrations/databases', async (req) => {
-    const me = requireRole(req, 'admin')
+    const me = staffAdmin(req)
     const b = dbBody.parse(req.body)
     const r = await one<any>(
       `INSERT INTO external_databases(name, kind, host, port, database, username, password_enc, ssl, enabled) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9) RETURNING id`,
@@ -43,7 +57,7 @@ export async function integrationRoutes(app: FastifyInstance) {
   })
 
   app.put('/api/integrations/databases/:id', async (req) => {
-    const me = requireRole(req, 'admin')
+    const me = staffAdmin(req)
     const { id } = z.object({ id: uuid }).parse(req.params)
     const b = dbBody.parse(req.body)
     await q(
@@ -56,7 +70,7 @@ export async function integrationRoutes(app: FastifyInstance) {
   })
 
   app.delete('/api/integrations/databases/:id', async (req) => {
-    const me = requireRole(req, 'admin')
+    const me = staffAdmin(req)
     const { id } = z.object({ id: uuid }).parse(req.params)
     await q(`DELETE FROM external_databases WHERE id=$1`, [id])
     await audit({ userId: me.id, action: 'integration.db_deleted', entity: 'external_database', entityId: id, ip: clientIp(req) })
@@ -64,7 +78,7 @@ export async function integrationRoutes(app: FastifyInstance) {
   })
 
   app.post('/api/integrations/databases/:id/test', async (req) => {
-    requireRole(req, 'admin')
+    staffAdmin(req)
     const { id } = z.object({ id: uuid }).parse(req.params)
     const db = await one<any>(`SELECT * FROM external_databases WHERE id=$1`, [id])
     if (!db) throw notFound()
@@ -73,7 +87,7 @@ export async function integrationRoutes(app: FastifyInstance) {
 
   // ============================================================ consultas cadastradas
   app.get('/api/integrations/queries', async (req) => {
-    currentUser(req)
+    staffAdmin(req)
     const rows = await q<any>(
       `SELECT q.*, d.name AS database_name, d.kind AS database_kind,
               (SELECT count(*) FROM query_runs r WHERE r.query_id=q.id AND r.created_at > now() - interval '7 days') AS runs_7d
@@ -110,7 +124,7 @@ export async function integrationRoutes(app: FastifyInstance) {
   }
 
   app.post('/api/integrations/queries', async (req) => {
-    const me = requireRole(req, 'admin')
+    const me = staffAdmin(req)
     const b = queryBody.parse(req.body)
     checkQuery(b)
     if (b.isVerification) await q(`UPDATE saved_queries SET is_verification=false`)
@@ -124,7 +138,7 @@ export async function integrationRoutes(app: FastifyInstance) {
   })
 
   app.put('/api/integrations/queries/:id', async (req) => {
-    const me = requireRole(req, 'admin')
+    const me = staffAdmin(req)
     const { id } = z.object({ id: uuid }).parse(req.params)
     const b = queryBody.parse(req.body)
     checkQuery(b)
@@ -139,7 +153,7 @@ export async function integrationRoutes(app: FastifyInstance) {
   })
 
   app.delete('/api/integrations/queries/:id', async (req) => {
-    const me = requireRole(req, 'admin')
+    const me = staffAdmin(req)
     const { id } = z.object({ id: uuid }).parse(req.params)
     await q(`DELETE FROM saved_queries WHERE id=$1`, [id])
     await audit({ userId: me.id, action: 'query.deleted', entity: 'saved_query', entityId: id, ip: clientIp(req) })
@@ -147,7 +161,7 @@ export async function integrationRoutes(app: FastifyInstance) {
   })
 
   app.post('/api/integrations/queries/:id/test', async (req) => {
-    const me = requireRole(req, 'admin')
+    const me = staffAdmin(req)
     const { id } = z.object({ id: uuid }).parse(req.params)
     const { params } = z.object({ params: z.record(z.string(), z.any()).default({}) }).parse(req.body ?? {})
     const t0 = Date.now()
@@ -157,7 +171,7 @@ export async function integrationRoutes(app: FastifyInstance) {
   })
 
   app.get('/api/integrations/query-runs', async (req) => {
-    requireRole(req, 'admin')
+    staffAdmin(req)
     return q(
       `SELECT r.*, q.label AS query_label, u.name AS user_name FROM query_runs r LEFT JOIN saved_queries q ON q.id=r.query_id LEFT JOIN users u ON u.id=r.user_id
         ORDER BY r.id DESC LIMIT 100`,
@@ -166,6 +180,7 @@ export async function integrationRoutes(app: FastifyInstance) {
 
   // ============================================================ webhooks
   app.get('/api/integrations/webhooks', async (req) => {
+    needIntegrations()
     requireRole(req, 'admin')
     const hooks = await q<any>(
       `SELECT w.*, (SELECT count(*) FROM webhook_deliveries d WHERE d.webhook_id=w.id AND d.status='failed' AND d.created_at > now() - interval '7 days') AS failed_7d,
@@ -177,6 +192,7 @@ export async function integrationRoutes(app: FastifyInstance) {
 
   const hookBody = z.object({ name: z.string().min(2).max(60), url: z.string().url(), events: z.array(z.string()).min(1), enabled: z.boolean().default(true) })
   app.post('/api/integrations/webhooks', async (req) => {
+    needIntegrations()
     const me = requireRole(req, 'admin')
     const b = hookBody.parse(req.body)
     const secret = randomToken(24)
@@ -185,6 +201,7 @@ export async function integrationRoutes(app: FastifyInstance) {
     return { id: r.id, secret }
   })
   app.put('/api/integrations/webhooks/:id', async (req) => {
+    needIntegrations()
     const me = requireRole(req, 'admin')
     const { id } = z.object({ id: uuid }).parse(req.params)
     const b = hookBody.parse(req.body)
@@ -193,12 +210,14 @@ export async function integrationRoutes(app: FastifyInstance) {
     return { ok: true }
   })
   app.delete('/api/integrations/webhooks/:id', async (req) => {
+    needIntegrations()
     requireRole(req, 'admin')
     const { id } = z.object({ id: uuid }).parse(req.params)
     await q(`DELETE FROM webhooks WHERE id=$1`, [id])
     return { ok: true }
   })
   app.post('/api/integrations/webhooks/:id/test', async (req) => {
+    needIntegrations()
     requireRole(req, 'admin')
     const { id } = z.object({ id: uuid }).parse(req.params)
     const h = await one<any>(`SELECT id FROM webhooks WHERE id=$1`, [id])
@@ -211,11 +230,13 @@ export async function integrationRoutes(app: FastifyInstance) {
     return { ok: true, deliveryId: d.id }
   })
   app.get('/api/integrations/webhooks/:id/deliveries', async (req) => {
+    needIntegrations()
     requireRole(req, 'admin')
     const { id } = z.object({ id: uuid }).parse(req.params)
     return q(`SELECT id, event, status, attempts, response_code, error, created_at, delivered_at FROM webhook_deliveries WHERE webhook_id=$1 ORDER BY id DESC LIMIT 50`, [id])
   })
   app.post('/api/integrations/webhooks/:id/rotate-secret', async (req) => {
+    needIntegrations()
     requireRole(req, 'admin')
     const { id } = z.object({ id: uuid }).parse(req.params)
     const secret = randomToken(24)

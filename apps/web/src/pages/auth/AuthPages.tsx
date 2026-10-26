@@ -42,7 +42,7 @@ function FractionField() {
             key={i}
             className="aspect-square rounded-[3px]"
             style={{
-              background: c === 'coral' ? '#FE5A51' : c === 'nimbus' ? 'rgb(153 193 228 / 0.55)' : c === 'linen' ? 'rgb(246 241 231 / 0.12)' : 'rgb(246 241 231 / 0.035)',
+              background: c === 'coral' ? 'var(--coral)' : c === 'nimbus' ? 'rgb(153 193 228 / 0.55)' : c === 'linen' ? 'rgb(246 241 231 / 0.12)' : 'rgb(246 241 231 / 0.035)',
             }}
           />
         ))}

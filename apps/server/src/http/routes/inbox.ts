@@ -195,7 +195,7 @@ export async function inboxRoutes(app: FastifyInstance) {
     })
     const mentions = [...b.text.matchAll(/@([\p{L}][\p{L}\s]{1,40}?)(?=\s|$|[,.!?])/gu)].map((m) => m[1]!.trim().toLowerCase())
     if (mentions.length) {
-      const users = await q<any>(`SELECT id, name FROM users WHERE active`)
+      const users = await q<any>(`SELECT id, name FROM users WHERE active AND platform_user_id IS NULL`)
       const { emitUser } = await import('../realtime.js')
       for (const usr of users) {
         if (mentions.some((m) => usr.name.toLowerCase().startsWith(m)) && usr.id !== u.id)

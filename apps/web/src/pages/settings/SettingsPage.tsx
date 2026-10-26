@@ -1,7 +1,7 @@
 import type { ReactElement } from 'react'
 import { NavLink, Navigate, Route, Routes } from 'react-router-dom'
 import { cx } from '../../components/ui'
-import { useSession } from '../../lib/session'
+import { moduleOn, useSession, type ModuleKey } from '../../lib/session'
 import { ConnectionsSettings } from './ConnectionsSettings'
 import { AuditSettings, PacingSettings, ProfileSettings, QuickRepliesSettings, RetentionSettings, SecuritySettings, SystemSettings, TagsSettings } from './MiscSettings'
 import { SectorsSettings } from './SectorsSettings'
@@ -14,6 +14,10 @@ export interface SettingsItem {
   group: string
   roles: ('admin' | 'supervisor' | 'agent')[]
   element: ReactElement
+  /** só com o módulo contratado */
+  module?: ModuleKey
+  /** só na sessão da equipe do fornecedor ("entrar como cliente") */
+  platformOnly?: boolean
 }
 
 const base: SettingsItem[] = [
@@ -32,8 +36,10 @@ const base: SettingsItem[] = [
 
 export function SettingsPage() {
   const { me } = useSession()
-  const role = me!.user.role
-  const items = [...base, ...settingsExtras].filter((i) => i.roles.includes(role))
+  const role = me!.user.role as 'admin' | 'supervisor' | 'agent'
+  const items = [...base, ...settingsExtras].filter(
+    (i) => i.roles.includes(role) && (!i.module || moduleOn(me, i.module)) && (!i.platformOnly || !!me!.impersonation),
+  )
   const groups = [...new Set(items.map((i) => i.group))]
   return (
     <div className="flex h-full">
