@@ -29,3 +29,20 @@ Toda requisição, tarefa da fila e evento do WhatsApp roda dentro de um **conte
 6. **Evento de tempo real:** use `emitStaff/emitManagers/emitUser/emitConversation`; eles colocam o prefixo do cliente sozinhos.
 7. **Requisição para URL informada por usuário:** `safeFetch` (bloqueia rede interna e confere o IP na conexão).
 8. Rode `apps/server/scripts/test-isolation.mjs` antes de abrir um pull request que mexa em banco, sessão, fila ou tempo real.
+
+## Painel do fornecedor, módulos e limites (Fase 2)
+
+| Peça | Arquivo | O que faz |
+|---|---|---|
+| Equipe do fornecedor | `migrations/platform/002_painel.sql` | O schema `plataforma` tem as mesmas tabelas de acesso de um cliente (`users`, `user_sessions`, `audit_log`, `settings`), então login, 2FA e auditoria são o mesmo código. Perfis: `admin`, `implantador`, `suporte` |
+| Escopo por hostname | `src/http/app.ts` | `PLATFORM_ROUTES` só respondem no painel; `TENANT_BLOCKED` nunca respondem em cliente. Sessão do painel sem 2FA ativo recebe 403 fora de `/api/auth/` |
+| Catálogo | `src/platform/modules.ts` | `MODULES`, `PLAN_PRESETS`, `DEFAULT_LIMITS`; `isModuleOn`, `flowEditMode`, `limitsOf`. O estado de cada cliente fica em `plataforma.tenant_modules` e `tenants.limits`, carregado no `TenantCtx` |
+| Portão | `gate()` e `permsOf()` em `src/http/app.ts` | Recusa rotas de módulo desligado (403) e ajusta as permissões devolvidas em `/api/auth/me`, que o painel usa para esconder menus |
+| Entrar como cliente | `routes/platform.ts` e `routes/auth.ts` | Token de 60 s em `plataforma.impersonation_tokens` → `GET /api/auth/impersonate` no subdomínio do cliente → usuário técnico (`users.platform_user_id`) e sessão de 2 h marcada com `impersonated_by` |
+
+Regras:
+
+9. **Rota nova de um módulo opcional** → inclua o prefixo em `gate()`; código que roda fora de requisição (fila, fluxo, automação) confere `isModuleOn(currentTenant(), '<módulo>')`.
+10. **Recurso que só a equipe do fornecedor usa** → `requirePlatformSession(req)` na rota e `platformOnly` no item de menu.
+11. **Contagem de usuários** de um cliente sempre com `platform_user_id IS NULL`: o usuário técnico não aparece em listas nem conta no limite.
+12. Rode também `apps/server/scripts/test-platform.mjs` antes de abrir um pull request que mexa no painel, em módulos, limites ou sessão.

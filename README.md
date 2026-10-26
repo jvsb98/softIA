@@ -9,9 +9,9 @@ Nasceu como fork do **Nimber Atende 1.0.4** (histórico preservado; as tags anti
 | Fase | Conteúdo | Situação |
 |---|---|---|
 | 0 | Arquitetura e inventário | Concluída |
-| 1 | Fundação multi-cliente: schema por cliente, contexto por subdomínio, fila/tempo real/WhatsApp por cliente, deploy no Droplet compartilhado | **Esta versão (0.1.0)** |
-| 2 | Painel do fornecedor: perfis, criar cliente em 5 passos, módulos e limites, white label, entrar como cliente, medidor de IA | Próxima |
-| 3 | Agenda (Google e Microsoft, profissionais + serviços, lembretes) | — |
+| 1 | Fundação multi-cliente: schema por cliente, contexto por subdomínio, fila/tempo real/WhatsApp por cliente, deploy no Droplet compartilhado | Concluída (0.1.0) |
+| 2 | Painel do fornecedor: perfis, criar cliente em 5 passos, módulos e limites, white label, entrar como cliente, medidor de IA | **Esta versão (0.2.0)** |
+| 3 | Agenda (Google e Microsoft, profissionais + serviços, lembretes) | Próxima |
 | 4 | CRM em funil (portado da Central WhatsApp) e modelos de segmento → piloto | — |
 | 5 | Disparo pela Z-API | — |
 | 6 | Operação: backup por cliente, alertas, manuais | — |

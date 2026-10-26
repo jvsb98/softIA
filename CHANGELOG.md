@@ -2,6 +2,23 @@
 
 Todas as mudanças relevantes do softIA. Formato baseado em [Keep a Changelog](https://keepachangelog.com/pt-BR/1.1.0/); versões seguem [SemVer](https://semver.org/lang/pt-BR/). As entradas 1.0.x e anteriores são do Nimber Atende, base deste projeto.
 
+## [0.2.0] — 2026-10-26 · Fase 2: painel do fornecedor
+
+### Adicionado
+- Painel do fornecedor em `PLATFORM_HOST` (padrão `painel.BASE_DOMAIN`), com a mesma tela de acesso dos clientes e verificação em duas etapas obrigatória, conferida no servidor.
+- Equipe do fornecedor com perfis: super admin (tudo), implantador (cria e configura clientes) e suporte (consulta e entra no ambiente informando o motivo). Comando `platform:create-admin`.
+- Clientes: lista com situação, números fora do ar, usuários e consumo de IA do mês; criação em cinco passos com senha temporária e mensagem pronta para WhatsApp; ficha com módulos, limites, marca, dados e cobrança e atividade recente.
+- Módulos por cliente (atendimento, CRM e agenda na base; fluxos, IA, relatórios, integrações e disparo opcionais) e planos de referência. Módulo desligado some do menu e a API recusa. Fluxos com três modos de edição: só o fornecedor, o cliente edita os existentes, o cliente cria novos.
+- Limites por cliente conferidos no servidor: números de WhatsApp, usuários ativos, profissionais (Fase 3) e franquia mensal de tokens de IA (bloquear ou só avisar ao estourar).
+- Provedores e modelos de IA únicos da plataforma, com consumo registrado por cliente (`plataforma.ai_usage`).
+- White label: nome do produto, cor principal e logo (PNG, JPG ou WEBP, até 300 KB) aplicados no login, no título e no ícone da aba do cliente. `PLATFORM_BRAND_NAME` para o nome do painel.
+- Entrar como cliente: token de uso único (60 s), sessão de até 2 horas com faixa "Acesso do fornecedor", usuário técnico que não aparece nem conta no limite do cliente, registro nas auditorias do cliente e da plataforma.
+- Teste ponta a ponta do painel (`apps/server/scripts/test-platform.mjs`, 42 verificações), rodando no CI.
+
+### Alterado
+- Consulta a bancos externos, compliance e nós avançados de fluxo ficam só com a equipe do fornecedor.
+- Rotas separadas por hostname: as da plataforma não respondem em subdomínio de cliente e vice-versa; a origem precisa ser o próprio hostname.
+
 ## [0.1.0] — 2026-10-25 · Fase 1: fundação multi-cliente
 
 ### Adicionado

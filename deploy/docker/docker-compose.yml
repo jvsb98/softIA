@@ -35,6 +35,8 @@ services:
       BASE_DOMAIN: ${BASE_DOMAIN:?defina BASE_DOMAIN no .env, por exemplo connectawork.app.br}
       PLATFORM_HOST: ${PLATFORM_HOST:-}
       PUBLIC_URL: ${PUBLIC_URL:?defina PUBLIC_URL no .env, por exemplo https://painel.connectawork.app.br}
+      # Nome do produto no painel do fornecedor (os clientes veem a marca de cada um)
+      PLATFORM_BRAND_NAME: ${PLATFORM_BRAND_NAME:-softIA}
       TRUST_PROXY: "true"
       LOG_LEVEL: ${LOG_LEVEL:-info}
       NODE_ENV: production

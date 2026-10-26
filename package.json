@@ -1,7 +1,7 @@
 {
   "name": "softia",
   "private": true,
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "softIA — SaaS white label de atendimento no WhatsApp para pequenas empresas (multi-cliente, fluxos, agenda e CRM)",
   "workspaces": [
     "apps/server",

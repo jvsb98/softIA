@@ -100,23 +100,33 @@ cp softia.global softia.site /opt/caddy-extra/   # arquivos de deploy/caddy/ do 
 docker exec central-whatsapp-site-1 caddy reload --config /etc/caddy/Caddyfile
 ```
 
-## 6. Criar um cliente (até o painel da Fase 2)
+## 6. Primeiro acesso ao painel do fornecedor
+
+Crie o seu acesso de super admin (uma vez):
 
 ```bash
 docker compose -f docker-compose.yml -f docker-compose.compartilhado.yml exec softia \
-  node server/dist/cli.js tenant:create alfa --name "Marmoraria Alfa" \
-  --admin-name "Ana" --admin-email ana@alfa.com.br --segment marmoraria
+  node server/dist/cli.js platform:create-admin --name "João Victor" --email ti@nimber.com.br
 ```
 
-A saída mostra o endereço (`https://alfa.connectawork.app.br`) e a senha temporária do administrador, que é trocada no primeiro acesso. Na primeira visita, o Caddy emite o certificado do subdomínio, o que leva alguns segundos.
+A saída mostra uma senha temporária. Abra `https://painel.connectawork.app.br`, entre, crie a sua senha e ative a verificação em duas etapas (obrigatória para toda a equipe do fornecedor; use um aplicativo como Google Authenticator ou Authy).
 
-Outros comandos, sempre com `exec softia node server/dist/cli.js`:
+No painel:
+
+- **Clientes → Novo cliente**: cinco passos (empresa e endereço, marca, módulos e limites, administrador, revisão). No fim aparecem a senha temporária do administrador do cliente e uma mensagem pronta para enviar pelo WhatsApp. Na primeira visita ao subdomínio, o Caddy emite o certificado, o que leva alguns segundos.
+- **Ficha do cliente**: situação dos números, módulos, limites, marca (nome, cor e logo), dados e cobrança, e **Entrar como cliente** (abre o ambiente dele em outra aba, por até 2 horas, registrado na auditoria dos dois lados).
+- **Equipe**: adicione implantadores e suporte. Só o super admin muda a situação de um cliente (suspender, cancelar), mexe na equipe e nos provedores de IA.
+- **IA (provedores e modelos)**: cadastre a chave da plataforma (OpenAI, Anthropic etc.) uma vez; vale para todos os clientes com o módulo IA, cada um com a sua franquia mensal.
+
+Comandos de apoio, sempre com `exec softia node server/dist/cli.js`:
 
 | Comando | O que faz |
 |---|---|
+| `platform:create-admin --name N --email E [--role implantador\|suporte]` | Cria alguém da equipe do fornecedor (padrão: super admin) |
+| `tenant:create alfa --name "Marmoraria Alfa" --admin-name Ana --admin-email ana@alfa.com.br --segment marmoraria` | Cria um cliente sem passar pelo painel |
 | `tenant:list` | Lista os clientes, a situação e os endereços |
 | `tenant:status alfa suspenso` | Suspende, reativa (`ativo`) ou cancela; o servidor para ou retoma as conexões de WhatsApp e as sessões abertas na hora |
-| `reset-admin ana@alfa.com.br --tenant alfa` | Senha temporária e remoção do 2FA de um usuário |
+| `reset-admin ana@alfa.com.br --tenant alfa` | Senha temporária e remoção do 2FA de um usuário do cliente |
 | `migrate` | Aplica migrações (o servidor já faz isso ao subir) |
 
 ## 7. Atualizar
