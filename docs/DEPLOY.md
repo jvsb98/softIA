@@ -74,16 +74,19 @@ O Caddy da Central passa a importar trechos de outros sistemas da pasta `/opt/ca
 
 ```bash
 mkdir -p /opt/softia /opt/caddy-extra && cd /opt/softia
-# arquivos do repositório: deploy/docker/docker-compose.yml, docker-compose.compartilhado.yml, .env.example
-curl -fsSLO https://raw.githubusercontent.com/jvsb98/softIA/main/deploy/docker/docker-compose.yml   # ou copie com scp
-curl -fsSLO https://raw.githubusercontent.com/jvsb98/softIA/main/deploy/docker/docker-compose.compartilhado.yml
-cp .env.example .env && nano .env      # BASE_DOMAIN, PUBLIC_URL, NIMBER_DB_*, NIMBER_MASTER_KEY
+R=https://raw.githubusercontent.com/jvsb98/softIA/main
+curl -fsSLO $R/deploy/docker/docker-compose.yml
+curl -fsSLO $R/deploy/docker/docker-compose.compartilhado.yml
+curl -fsSL  $R/deploy/docker/.env.example -o .env.example
+curl -fsSLO $R/deploy/caddy/softia.global
+curl -fsSLO $R/deploy/caddy/softia.site
+cp .env.example .env && chmod 600 .env && nano .env   # BASE_DOMAIN, PUBLIC_URL, NIMBER_DB_*, NIMBER_MASTER_KEY
 ```
 
-> Repositório privado: o `curl` do GitHub precisa de token. É mais simples copiar os três arquivos com `scp`.
+> Se o repositório virar privado, o `curl` precisa de token. Aí é mais simples copiar os arquivos com `scp`.
 
 - **Chave-mestra:** gere com `openssl rand -base64 32`, coloque em `NIMBER_MASTER_KEY` e guarde uma cópia fora do servidor. Sem ela, os segredos gravados no banco (2FA, chaves de IA) não podem ser lidos.
-- **Imagem:** o GitHub Actions publica `ghcr.io/jvsb98/softia:main` a cada push na `main`. Como o pacote é privado, faça login uma vez no Droplet com um token do GitHub (permissão `read:packages`):
+- **Imagem:** o GitHub Actions publica `ghcr.io/jvsb98/softia:main` a cada push na `main`. Se o `pull` responder `denied` ou `unauthorized`, o pacote está privado: faça login uma vez no Droplet com um token do GitHub (permissão `read:packages`), ou deixe o pacote público em GitHub → Packages → softia → Package settings:
   ```bash
   echo <TOKEN> | docker login ghcr.io -u jvsb98 --password-stdin
   ```
@@ -96,7 +99,7 @@ $C pull && $C up -d
 curl -s http://127.0.0.1:8080/api/health      # {"ok":true,"app":"softia",...}
 
 # Trechos do Caddy (on-demand TLS) e recarga do Caddy da Central
-cp softia.global softia.site /opt/caddy-extra/   # arquivos de deploy/caddy/ do repositório
+cp softia.global softia.site /opt/caddy-extra/
 docker exec central-whatsapp-site-1 caddy reload --config /etc/caddy/Caddyfile
 ```
 
