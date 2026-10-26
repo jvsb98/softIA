@@ -13,6 +13,7 @@ import { runChat } from '../ai/router.js'
 import { getSetting } from '../ops/settings.js'
 import { execute } from './engine.js'
 import type { FlowDefinition, FlowIO, RunState } from './types.js'
+import { moduleOn } from '../platform/modules.js'
 
 async function loadHistory(conversationId: string) {
   const rows = await q<any>(
@@ -168,7 +169,8 @@ export async function processWithFlow(conv: ConversationRow, reason: string, tim
 
 export function registerFlowRuntime() {
   // Fluxo tem prioridade sobre o agente padrão
-  registerAutomation('flow', (conv, reason) => processWithFlow(conv, reason), { first: true })
+  // Fluxos só rodam com o módulo contratado
+  registerAutomation('flow', (conv, reason) => (moduleOn('fluxos') ? processWithFlow(conv, reason) : Promise.resolve(false)), { first: true })
   work(
     'flow.timer',
     async (job: Job<{ runId: string; token: string }>) => {

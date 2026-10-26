@@ -7,6 +7,12 @@ import { db, migrateTenant, one, q, tx } from '../lib/db.js'
 import { log } from '../lib/logger.js'
 import { schemaForSlug, SLUG_RE, withPlatform, withTenant, type TenantCtx } from '../lib/tenant.js'
 import { publishPlatformEvent } from './events.js'
+import { DEFAULT_LIMITS, MODULES, PLAN_PRESETS, type ModuleState, type TenantLimits } from './modules.js'
+
+/** Colunas do cliente + módulos ligados (um JSON por módulo), para montar o contexto. */
+const TENANT_COLS = `t.id, t.slug, t.schema_name, t.name, t.status, t.limits,
+  coalesce((SELECT jsonb_object_agg(m.module, jsonb_build_object('enabled', m.enabled, 'config', m.config))
+              FROM tenant_modules m WHERE m.tenant_id = t.id), '{}'::jsonb) AS modules`
 
 /** Subdomínios que nunca viram cliente. */
 export const RESERVED_SLUGS = new Set([
@@ -29,7 +35,7 @@ export function normalizeHost(h: string | undefined | null): string {
 }
 
 export function tenantFromRow(r: any): TenantCtx {
-  return { kind: 'tenant', id: r.id, slug: r.slug, schema: r.schema_name, name: r.name, status: r.status }
+  return { kind: 'tenant', id: r.id, slug: r.slug, schema: r.schema_name, name: r.name, status: r.status, modules: r.modules ?? {}, limits: r.limits ?? {} }
 }
 
 export async function resolveHost(hostHeader: string | undefined | null): Promise<HostResolution> {
@@ -41,7 +47,7 @@ export async function resolveHost(hostHeader: string | undefined | null): Promis
   if (c && Date.now() - c.at < (c.v.kind === 'unknown' ? 5_000 : TTL)) return c.v
   const row = await withPlatform(() =>
     one<any>(
-      `SELECT t.id, t.slug, t.schema_name, t.name, t.status FROM domains d JOIN tenants t ON t.id = d.tenant_id
+      `SELECT ${TENANT_COLS} FROM domains d JOIN tenants t ON t.id = d.tenant_id
         WHERE d.hostname = $1 AND t.status <> 'cancelado'`,
       [host],
     ),
@@ -67,7 +73,7 @@ export async function isKnownHost(hostname: string): Promise<boolean> {
 export async function getTenant(idOrSlug: string): Promise<TenantCtx | null> {
   const isUuid = /^[0-9a-f-]{36}$/i.test(idOrSlug)
   const row = await withPlatform(() =>
-    one<any>(`SELECT id, slug, schema_name, name, status FROM tenants WHERE ${isUuid ? 'id' : 'slug'} = $1`, [idOrSlug]),
+    one<any>(`SELECT ${TENANT_COLS} FROM tenants t WHERE t.${isUuid ? 'id' : 'slug'} = $1`, [idOrSlug]),
   )
   return row ? tenantFromRow(row) : null
 }
@@ -85,7 +91,7 @@ export async function getTenantCached(id: string): Promise<TenantCtx | null> {
 /** Clientes que o servidor deve atender (conexões de WhatsApp, tarefas): implantação e ativos. */
 export async function listRunningTenants(): Promise<TenantCtx[]> {
   const rows = await withPlatform(() =>
-    q<any>(`SELECT id, slug, schema_name, name, status FROM tenants WHERE status IN ('implantacao','ativo') ORDER BY created_at`),
+    q<any>(`SELECT ${TENANT_COLS} FROM tenants t WHERE t.status IN ('implantacao','ativo') ORDER BY t.created_at`),
   )
   return rows.map(tenantFromRow)
 }
@@ -105,6 +111,18 @@ export interface CreateTenantInput {
   adminEmail: string
   /** sem senha: gera uma temporária, trocada no primeiro acesso */
   adminPassword?: string
+  /** plano de referência (essencial, profissional, completo): preenche módulos e limites */
+  plan?: string | null
+  /** módulos ligados (sobrepõe o plano) */
+  modules?: Partial<Record<string, ModuleState>>
+  /** limites (sobrepõe o plano) */
+  limits?: Partial<TenantLimits>
+  /** marca: nome do produto e cor principal */
+  brand?: { productName?: string; primaryColor?: string }
+  contact?: Record<string, any>
+  notes?: string | null
+  /** pessoa da equipe do fornecedor que criou (auditoria) */
+  createdBy?: string | null
 }
 
 export interface CreateTenantResult {
@@ -139,17 +157,23 @@ export async function createTenant(input: CreateTenantInput): Promise<CreateTena
     // Um schema que sobrou (cliente apagado à mão, restauração) nunca é reaproveitado
     const leftover = await one(`SELECT 1 FROM pg_namespace WHERE nspname=$1`, [schema])
     if (leftover) throw new Error(`O schema ${schema} já existe no banco. Remova-o (ou use outro endereço) antes de criar o cliente.`)
+    const preset = PLAN_PRESETS.find((p) => p.key === (input.plan ?? 'essencial')) ?? PLAN_PRESETS[0]!
+    const limits = { ...DEFAULT_LIMITS, ...preset.limits, ...(input.limits ?? {}) }
+    const modules = { ...preset.modules, ...(input.modules ?? {}) }
     return tx(async (c) => {
       const t = (
-        await c.query(`INSERT INTO tenants(slug, name, schema_name, segment) VALUES ($1,$2,$3,$4) RETURNING id, slug, schema_name, name, status`, [
-          slug,
-          input.name.trim(),
-          schema,
-          input.segment ?? null,
-        ])
+        await c.query(
+          `INSERT INTO tenants(slug, name, schema_name, segment, plan, limits, brand, contact, notes, created_by)
+           VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10) RETURNING id`,
+          [slug, input.name.trim(), schema, input.segment ?? null, preset.key, JSON.stringify(limits), JSON.stringify(input.brand ?? {}), JSON.stringify(input.contact ?? {}), input.notes ?? null, input.createdBy ?? null],
+        )
       ).rows[0]
       await c.query(`INSERT INTO domains(hostname, tenant_id, kind) VALUES ($1,$2,'subdominio')`, [host, t.id])
-      return t
+      for (const def of MODULES) {
+        const m = modules[def.key as keyof typeof modules]
+        if (!def.base && m) await c.query(`INSERT INTO tenant_modules(tenant_id, module, enabled, config, updated_by) VALUES ($1,$2,$3,$4,$5)`, [t.id, def.key, m.enabled, JSON.stringify(m.config ?? {}), input.createdBy ?? null])
+      }
+      return (await c.query(`SELECT ${TENANT_COLS} FROM tenants t WHERE t.id=$1`, [t.id])).rows[0]
     })
   })
   const tenant = tenantFromRow(row)
