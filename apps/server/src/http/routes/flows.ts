@@ -1,6 +1,5 @@
 import type { FastifyInstance } from 'fastify'
 import { z } from 'zod'
-import { effectivePermissions } from '../../auth/service.js'
 import { one, q, tx } from '../../lib/db.js'
 import { audit } from '../../ops/audit.js'
 import { NODE_TYPES } from '../../flows/nodes.js'
@@ -9,7 +8,7 @@ import { TEMPLATES } from '../../flows/templates.js'
 import type { FlowDefinition } from '../../flows/types.js'
 import { validateFlow } from '../../flows/validate.js'
 import { badRequest, forbidden, notFound } from '../errors.js'
-import { clientIp, currentUser, requirePermission } from '../app.js'
+import { clientIp, currentUser, permsOf, requirePermission } from '../app.js'
 
 const uuid = z.string().uuid()
 const defSchema = z.object({
@@ -45,7 +44,7 @@ export async function flowRoutes(app: FastifyInstance) {
   })
 
   app.post('/api/flows', async (req) => {
-    const me = requirePermission(req, 'flowsEdit')
+    const me = requirePermission(req, 'flowsCreate')
     const b = z.object({ name: z.string().min(2).max(80), description: z.string().max(300).optional(), templateId: z.string().optional() }).parse(req.body)
     let draft: FlowDefinition = { nodes: [{ id: 'start', type: 'start', position: { x: 0, y: 0 }, data: {} }], edges: [] }
     if (b.templateId) {
@@ -80,14 +79,14 @@ export async function flowRoutes(app: FastifyInstance) {
     const me = requirePermission(req, 'flowsEdit')
     const { id } = z.object({ id: uuid }).parse(req.params)
     const b = z.object({ draft: defSchema, name: z.string().min(2).max(80).optional(), description: z.string().max(300).nullable().optional() }).parse(req.body)
-    const perms = effectivePermissions(me.role, me.permissions)
+    const perms = permsOf(req)
     if (!perms.flowsAdvanced) {
       // Quem não tem nós avançados não pode criar nem alterar nós avançados
       const current = await one<any>(`SELECT draft FROM flows WHERE id=$1`, [id])
       const advanced = new Set(NODE_TYPES.filter((t) => t.advanced).map((t) => t.type))
       const before = new Map<string, any>((current?.draft?.nodes ?? []).filter((n: any) => advanced.has(n.type)).map((n: any) => [n.id, JSON.stringify(n.data)]))
       for (const n of b.draft.nodes)
-        if (advanced.has(n.type) && before.get(n.id) !== JSON.stringify(n.data)) throw forbidden('Você não tem permissão para editar nós avançados (código, HTTP).')
+        if (advanced.has(n.type) && before.get(n.id) !== JSON.stringify(n.data)) throw forbidden('Nós avançados (código, HTTP) são configurados pela equipe do fornecedor.')
     }
     await q(
       `UPDATE flows SET draft=$2, draft_updated_at=now(), draft_updated_by=$3, name=coalesce($4,name), description=CASE WHEN $5::boolean THEN $6 ELSE description END WHERE id=$1`,
@@ -101,7 +100,7 @@ export async function flowRoutes(app: FastifyInstance) {
     const { id } = z.object({ id: uuid }).parse(req.params)
     const f = await one<any>(`SELECT draft FROM flows WHERE id=$1`, [id])
     if (!f) throw notFound()
-    return validateFlow(f.draft, { allowAdvanced: effectivePermissions(me.role, me.permissions).flowsAdvanced })
+    return validateFlow(f.draft, { allowAdvanced: permsOf(req).flowsAdvanced })
   })
 
   app.post('/api/flows/:id/publish', async (req) => {
@@ -110,7 +109,7 @@ export async function flowRoutes(app: FastifyInstance) {
     const { note } = z.object({ note: z.string().max(300).optional() }).parse(req.body ?? {})
     const f = await one<any>(`SELECT draft, name FROM flows WHERE id=$1`, [id])
     if (!f) throw notFound()
-    const issues = validateFlow(f.draft, { allowAdvanced: effectivePermissions(me.role, me.permissions).flowsAdvanced })
+    const issues = validateFlow(f.draft, { allowAdvanced: permsOf(req).flowsAdvanced })
     const errors = issues.filter((i) => i.level === 'error')
     if (errors.length) throw badRequest('Corrija os erros antes de publicar.', errors)
     const v = await tx(async (c) => {
@@ -160,7 +159,7 @@ export async function flowRoutes(app: FastifyInstance) {
   })
 
   app.post('/api/flows/:id/duplicate', async (req) => {
-    const me = requirePermission(req, 'flowsEdit')
+    const me = requirePermission(req, 'flowsCreate')
     const { id } = z.object({ id: uuid }).parse(req.params)
     const f = await one<any>(`SELECT name, description, draft FROM flows WHERE id=$1`, [id])
     if (!f) throw notFound()

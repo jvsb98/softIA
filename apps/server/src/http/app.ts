@@ -8,12 +8,13 @@ import rateLimit from '@fastify/rate-limit'
 import fstatic from '@fastify/static'
 import Fastify, { type FastifyInstance, type FastifyReply, type FastifyRequest } from 'fastify'
 import { ZodError } from 'zod'
-import { effectivePermissions, resolveSession, type ResolvedSession, type Role } from '../auth/service.js'
+import { effectivePermissions, resolveSession, type Permissions, type ResolvedSession, type Role } from '../auth/service.js'
 import type { AppConfig } from '../lib/config.js'
 import { log } from '../lib/logger.js'
 import { runInCtx, withPlatform, type ExecCtx } from '../lib/tenant.js'
 import { normalizeHost, resolveHost } from '../platform/tenants.js'
-import { forbidden, HttpError, unauthorized } from './errors.js'
+import { flowEditMode, isModuleOn, MODULES, type ModuleKey } from '../platform/modules.js'
+import { badRequest, forbidden, HttpError, unauthorized } from './errors.js'
 
 declare module 'fastify' {
   interface FastifyRequest {
@@ -48,10 +49,86 @@ export function requireRole(req: FastifyRequest, ...roles: Role[]) {
   return u
 }
 
-export function requirePermission(req: FastifyRequest, perm: 'flowsAdvanced' | 'flowsEdit' | 'kbEdit' | 'reports') {
+/** Sessão aberta pela equipe do fornecedor ("entrar como cliente")? */
+export function isPlatformSession(req: FastifyRequest) {
+  return !!req.session?.impersonation
+}
+
+/** Recursos que ficam só com o fornecedor: nó Código, consultas a bancos externos, compliance. */
+export function requirePlatformSession(req: FastifyRequest) {
   const u = currentUser(req)
-  if (!effectivePermissions(u.role, u.permissions)[perm]) throw forbidden()
+  if (!isPlatformSession(req)) throw forbidden('Recurso disponível só para a equipe do fornecedor.')
   return u
+}
+
+/** Permissões do usuário já considerando os módulos contratados e o modo de edição de fluxos do cliente. */
+export function permsOf(req: FastifyRequest) {
+  const u = currentUser(req)
+  const platform = isPlatformSession(req)
+  const p: Required<Permissions> & { flowsCreate: boolean } = { ...effectivePermissions(u.role, u.permissions, platform), flowsCreate: false }
+  const t = req.execCtx?.kind === 'tenant' ? req.execCtx : null
+  if (t) {
+    const mode = flowEditMode(t)
+    if (!isModuleOn(t, 'fluxos') || (!platform && mode === 'fornecedor')) p.flowsEdit = false
+    p.flowsCreate = p.flowsEdit && (platform || mode === 'cliente_cria')
+    if (!isModuleOn(t, 'ia')) p.kbEdit = false
+    if (!isModuleOn(t, 'relatorios')) p.reports = false
+  }
+  return p
+}
+
+export function requirePermission(req: FastifyRequest, perm: 'flowsAdvanced' | 'flowsEdit' | 'flowsCreate' | 'kbEdit' | 'reports') {
+  const u = currentUser(req)
+  if (!permsOf(req)[perm]) throw forbidden()
+  return u
+}
+
+/** Rotas do painel do fornecedor (hostname da plataforma). */
+const PLATFORM_ROUTES = ['/api/auth/', '/api/platform/', '/api/ai/providers', '/api/ai/tasks', '/api/ai/usage', '/api/audit', '/api/brand']
+/** Rotas que nunca respondem no hostname de um cliente. */
+const TENANT_BLOCKED = ['/api/platform/', '/api/ai/providers', '/api/ai/tasks']
+
+const notFoundRoute = () => new HttpError(404, 'Rota não encontrada')
+
+/**
+ * Módulos contratados e recursos do fornecedor, conferidos no servidor em cada requisição do cliente.
+ * Módulo desligado = 403 (a tela some e a API recusa).
+ */
+function gate(req: FastifyRequest, path: string) {
+  const t = req.execCtx?.kind === 'tenant' ? req.execCtx : null
+  const write = !['GET', 'HEAD', 'OPTIONS'].includes(req.method)
+  const need = (key: ModuleKey) => {
+    if (!isModuleOn(t, key)) throw forbidden(`Módulo não contratado: ${MODULES.find((m) => m.key === key)?.label ?? key}. Fale com o fornecedor do sistema.`)
+  }
+  if (/^\/api\/integrations\/(databases|queries|query-runs)/.test(path)) return void requirePlatformSession(req)
+  if (path.startsWith('/api/integrations/webhooks')) return need('integracoes')
+  if (path.startsWith('/api/ai/') || path.startsWith('/api/kb/') || /^\/api\/conversations\/[^/]+\/(suggest|handoff-card)/.test(path)) return need('ia')
+  if (path.startsWith('/api/reports')) return need('relatorios')
+  if (path.startsWith('/api/flows') && write) {
+    need('fluxos')
+    if (isPlatformSession(req) || /\/simulate$|\/validate$/.test(path)) return
+    const mode = flowEditMode(t)
+    const creating = (req.method === 'POST' && path === '/api/flows') || /\/duplicate$/.test(path)
+    if (creating && mode !== 'cliente_cria') throw forbidden('Criar fluxos novos está liberado só para o fornecedor neste plano.')
+    if (!creating && mode === 'fornecedor') throw forbidden('Os fluxos deste ambiente são mantidos pelo fornecedor.')
+    return
+  }
+  if (path.startsWith('/api/settings/') && write) {
+    const key = path.split('/')[3]
+    if (key === 'compliance') return void requirePlatformSession(req)
+    if (key === 'ai' || key === 'qualification' || key === 'handoff') return need('ia')
+    if (key === 'notifications') return need('integracoes')
+  }
+}
+
+/** Caminho da URL sem a query, decodificado (null se a codificação for inválida). */
+export function decodedPath(url: string): string | null {
+  const raw = url.split('?')[0] ?? ''
+  try {
+    return decodeURIComponent(raw)
+  } catch {
+    return null
+  }
 }
 
 export function clientIp(req: FastifyRequest) {
@@ -66,7 +143,7 @@ export function clearSessionCookie(reply: FastifyReply) {
   reply.clearCookie(SESSION_COOKIE, { path: '/' })
 }
 
-const PUBLIC_PREFIXES = ['/api/health', '/api/setup/', '/api/auth/login', '/api/auth/2fa/verify', '/api/auth/logout', '/api/public/']
+const PUBLIC_PREFIXES = ['/api/health', '/api/setup/', '/api/auth/login', '/api/auth/2fa/verify', '/api/auth/logout', '/api/auth/impersonate', '/api/public/', '/api/brand']
 
 export async function buildApp(cfg: AppConfig): Promise<FastifyInstance> {
   const app = Fastify({
@@ -165,7 +242,11 @@ export async function buildApp(cfg: AppConfig): Promise<FastifyInstance> {
 
   // Sessão + proteção CSRF (verificação de Origin em métodos de escrita)
   app.addHook('onRequest', async (req) => {
-    if (!req.url.startsWith('/api/')) return
+    // As regras abaixo olham o caminho JÁ decodificado, igual ao que o roteador usa para achar a rota:
+    // "/api/%66lows" chega ao mesmo handler que "/api/flows" e não pode escapar das verificações.
+    const path = decodedPath(req.url)
+    if (path === null) throw badRequest('Endereço inválido.')
+    if (!path.startsWith('/api/')) return
     if (!['GET', 'HEAD', 'OPTIONS'].includes(req.method)) {
       const origin = req.headers.origin as string | undefined
       if (origin) {
@@ -178,19 +259,25 @@ export async function buildApp(cfg: AppConfig): Promise<FastifyInstance> {
         if (originHost !== req.headers.host) {
           // Subdomínios irmãos contam como o mesmo "site" para o SameSite: num cliente, só a própria origem escreve
           const devOrigin = process.env.NODE_ENV !== 'production' && /^(localhost|127\.0\.0\.1)$/.test(originHost.replace(/:\d+$/, ''))
-          if (req.execCtx?.kind === 'tenant' ? !devOrigin : !allowedOrigin(origin)) throw forbidden('Origem da requisição não permitida.')
+          // (vale também para o painel do fornecedor: uma página de cliente nunca escreve no painel)
+          if (!devOrigin) throw forbidden('Origem da requisição não permitida.')
         }
       }
     }
-    if (req.execCtx?.kind !== 'tenant') {
-      // Painel do fornecedor: login próprio na Fase 2. Por ora só as rotas sem contexto de cliente.
-      if (HOSTLESS_PATHS.some((p) => req.url.startsWith(p))) return
-      throw unauthorized()
-    }
+    if (HOSTLESS_PATHS.includes(path)) return
+    // Cada hostname só atende as rotas do seu lado: painel do fornecedor x ambiente do cliente
+    if (req.execCtx?.kind === 'platform') {
+      if (!PLATFORM_ROUTES.some((p) => path.startsWith(p))) throw notFoundRoute()
+    } else if (TENANT_BLOCKED.some((p) => path.startsWith(p))) throw notFoundRoute()
+
     req.session = await resolveSession(req.cookies[SESSION_COOKIE])
-    if (PUBLIC_PREFIXES.some((p) => req.url.startsWith(p))) return
+    if (PUBLIC_PREFIXES.some((p) => path.startsWith(p))) return
     if (!req.session) throw unauthorized()
-    if (req.session.mfaPending && !req.url.startsWith('/api/auth/')) throw unauthorized('Confirme o código de verificação em duas etapas.')
+    if (req.session.mfaPending && !path.startsWith('/api/auth/')) throw unauthorized('Confirme o código de verificação em duas etapas.')
+    // Painel do fornecedor: sem 2FA ativo, só as rotas de acesso (a configuração do 2FA) funcionam
+    if (req.execCtx?.kind === 'platform' && !req.session.user.totp_enabled && !path.startsWith('/api/auth/'))
+      throw forbidden('Ative a verificação em duas etapas para usar o painel do fornecedor.')
+    if (req.execCtx?.kind === 'tenant') gate(req, path)
   })
 
   app.setErrorHandler((err: any, req, reply) => {
@@ -227,13 +314,6 @@ export async function buildApp(cfg: AppConfig): Promise<FastifyInstance> {
       setHeaders: (reply, filePath) => {
         reply.header('Cache-Control', /[\\/]assets[\\/]/.test(filePath) ? 'public, max-age=31536000, immutable' : 'no-cache')
       },
-    })
-    // Painel do fornecedor (Fase 2): por enquanto, só um aviso no hostname da plataforma.
-    app.addHook('onRequest', async (req, reply) => {
-      if (req.execCtx?.kind !== 'platform') return
-      const path = req.url.split('?')[0] ?? ''
-      if (path.startsWith('/api/') || path.startsWith('/socket.io')) return
-      return reply.type('text/html; charset=utf-8').send(simplePage('Painel do fornecedor', 'O painel de administração dos clientes chega na Fase 2.'))
     })
     // A raiz é uma pasta: sem esta rota o plugin responde 403 em "/"
     app.get('/', (_req, reply) => reply.sendFile('index.html'))

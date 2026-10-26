@@ -21,6 +21,7 @@ import { registerIntegrationTools } from './integrations/tools.js'
 import { registerWebhooks } from './integrations/webhooks.js'
 import { registerFollowups } from './ops/followups.js'
 import { isKnownHost } from './platform/tenants.js'
+import { platformRoutes } from './http/routes/platform.js'
 
 export async function registerModules(app: FastifyInstance, cfg: AppConfig) {
   const secure = cfg.server.publicUrl.startsWith('https://')
@@ -37,6 +38,7 @@ export async function registerModules(app: FastifyInstance, cfg: AppConfig) {
   await flowRoutes(app)
   await integrationRoutes(app)
   await reportRoutes(app)
+  await platformRoutes(app)
 
   registerOutboundWorker()
   registerAutomationWorker()

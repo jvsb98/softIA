@@ -12,6 +12,7 @@ import {
 } from 'react'
 import { createPortal } from 'react-dom'
 import { initials } from '../../lib/format'
+import { useBrand } from '../../lib/brand'
 
 export const cx = clsx
 
@@ -202,13 +203,24 @@ export function PixelGlyph({ pattern, size = 24, className }: { pattern: keyof t
   )
 }
 
+/** Marca do ambiente: logo do cliente (white label) ou o glifo com o nome do produto. */
 export function Logo({ compact }: { compact?: boolean }) {
+  const b = useBrand().data
+  if (b?.logoUrl) return <img src={b.logoUrl} alt={b.productName} className={compact ? 'size-9 rounded-[8px] object-contain' : 'h-9 max-w-[180px] object-contain'} />
+  const name = b?.productName ?? 'softIA'
   return (
     <span className="inline-flex items-center gap-2 text-ink">
       <PixelGlyph pattern="mark" size={compact ? 22 : 20} className="text-coral" />
       {!compact && (
         <span className="leading-none">
-          <span className="font-semibold tracking-tight">soft</span><span className="text-muted">IA</span>
+          {name === 'softIA' ? (
+            <>
+              <span className="font-semibold tracking-tight">soft</span>
+              <span className="text-muted">IA</span>
+            </>
+          ) : (
+            <span className="font-semibold tracking-tight">{name}</span>
+          )}
         </span>
       )}
     </span>

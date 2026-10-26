@@ -1,11 +1,12 @@
 import { useQuery, useQueryClient } from '@tanstack/react-query'
-import { LogOut, MessagesSquare, Monitor, Moon, Settings, Sun, Users, type LucideIcon } from 'lucide-react'
+import { LogOut, MessagesSquare, Monitor, Moon, Settings, ShieldAlert, Sun, Users, type LucideIcon } from 'lucide-react'
 import { useEffect, useRef, useState } from 'react'
 import { NavLink, Outlet, useNavigate } from 'react-router-dom'
 import { toast } from 'sonner'
 import { Avatar, cx, Logo } from '../components/ui'
 import { api } from '../lib/api'
-import { useSession } from '../lib/session'
+import { brandName } from '../lib/brand'
+import { moduleOn, useSession, type ModuleKey } from '../lib/session'
 import { getSocket } from '../lib/socket'
 import { getThemePref, setThemePref, type ThemePref } from '../lib/theme'
 import { extraNav } from './nav.extra'
@@ -14,6 +15,8 @@ export interface NavItem {
   to: string
   label: string
   icon: LucideIcon
+  /** só aparece com o módulo contratado */
+  module?: ModuleKey
   show?: (role: string, perms: Record<string, boolean>) => boolean
 }
 
@@ -196,15 +199,17 @@ export function Shell() {
   const counts = useQuery({ queryKey: ['counts'], queryFn: () => api.get<any>('/api/conversations/counts'), refetchInterval: 30_000 })
   const badge = Number(counts.data?.mine_unread ?? 0) + Number(counts.data?.queue ?? 0)
   useEffect(() => {
-    document.title = badge > 0 ? `(${badge}) softIA` : 'softIA'
+    document.title = badge > 0 ? `(${badge}) ${brandName()}` : brandName()
     ;(window as any).nimberDesktop?.setBadge?.(badge)
   }, [badge])
   if (!me) return null
   const nav = [...baseNav, ...extraNav, { to: '/configuracoes', label: 'Configurações', icon: Settings } as NavItem].filter(
-    (n) => !n.show || n.show(me.user.role, me.user.permissions as any),
+    (n) => (!n.module || moduleOn(me, n.module)) && (!n.show || n.show(me.user.role, me.user.permissions as any)),
   )
   return (
-    <div className="flex h-full">
+    <div className="flex h-full flex-col">
+      {me.impersonation && <ImpersonationBar imp={me.impersonation} />}
+      <div className="flex min-h-0 flex-1">
       <aside className="flex w-[64px] shrink-0 flex-col items-center justify-between border-r border-line bg-panel py-4">
         <div className="flex flex-col items-center gap-5">
           <NavLink to="/atendimento" aria-label="Início">
@@ -242,6 +247,25 @@ export function Shell() {
       <main className="min-w-0 flex-1 overflow-hidden">
         <Outlet />
       </main>
+      </div>
+    </div>
+  )
+}
+
+/** Faixa fixa enquanto a equipe do fornecedor está dentro do ambiente do cliente. */
+function ImpersonationBar({ imp }: { imp: NonNullable<ReturnType<typeof useSession>['me']>['impersonation'] & {} }) {
+  const { logout } = useSession()
+  const until = new Date(imp.expiresAt).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })
+  return (
+    <div className="flex items-center gap-3 bg-navy px-4 py-1.5 text-[12.5px] text-linen dark:bg-linen dark:text-navy" role="status">
+      <ShieldAlert className="size-4 shrink-0 text-coral" />
+      <span className="min-w-0 truncate">
+        <strong>Acesso do fornecedor</strong> — {imp.byName ?? 'equipe'}
+        {imp.reason ? ` · ${imp.reason}` : ''} · válido até {until}. Tudo o que for feito fica registrado na auditoria.
+      </span>
+      <button className="ml-auto shrink-0 rounded-[6px] border border-linen/30 px-2 py-0.5 hover:bg-linen/10 dark:border-navy/30" onClick={() => void logout().then(() => window.close())}>
+        Encerrar acesso
+      </button>
     </div>
   )
 }

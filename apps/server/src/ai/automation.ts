@@ -13,6 +13,7 @@ import { getSetting } from '../ops/settings.js'
 import { applyOutcome, defaultAgent, registerAgentWorkers, runAgentTurn } from './agent.js'
 import { registerKbWorkers } from './kb.js'
 import { runTranscription } from './router.js'
+import { moduleOn } from '../platform/modules.js'
 
 export function registerAi() {
   registerKbWorkers()
@@ -20,6 +21,7 @@ export function registerAi() {
 
   // Automação padrão (prioridade menor que a dos fluxos, registrados depois na fase 3 com unshift)
   registerAutomation('ai-default-agent', async (conv) => {
+    if (!moduleOn('ia')) return false // sem o módulo, a conversa segue para o setor (ou para o fluxo)
     const ai = await getSetting('ai', { enabled: true })
     if (!ai.enabled) return false
     const agent = await defaultAgent()

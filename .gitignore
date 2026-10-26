@@ -19,3 +19,4 @@ out/
 .diagnostico/
 backup-antes-*/
 diagnostico-nimber-atende.txt
+*.tsbuildinfo

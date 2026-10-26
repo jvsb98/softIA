@@ -6,10 +6,12 @@ import { log } from '../lib/logger.js'
 import { getSetting } from './settings.js'
 import { safeFetch } from '../lib/net-guard.js'
 import { ctxKey, tenantOrNull } from '../lib/tenant.js'
+import { isModuleOn } from '../platform/modules.js'
 
 const lastSent = new Map<string, number>()
 
 export async function notifyTeam(key: string, text: string, kind: 'connection' | 'compliance' | 'system' = 'system') {
+  if (!isModuleOn(tenantOrNull(), 'integracoes')) return
   const cfg = await getSetting('notifications', { slackWebhookUrl: '', notifyConnectionDown: true, notifyComplianceBlock: true })
   if (!cfg.slackWebhookUrl) return
   if (kind === 'connection' && !cfg.notifyConnectionDown) return

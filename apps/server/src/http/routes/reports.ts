@@ -64,7 +64,7 @@ export async function reportRoutes(app: FastifyInstance) {
               (SELECT round(extract(epoch FROM avg(c.first_response_at - c.assigned_at))/60, 1) FROM conversations c WHERE c.assignee_id=u.id AND c.first_response_at >= c.assigned_at AND c.created_at > now() - ($1 || ' days')::interval) AS avg_first_response_min
          FROM users u LEFT JOIN conversation_events e
            ON ((e.data->>'user_id') = u.id::text OR e.actor_id = u.id) AND e.created_at > now() - ($1 || ' days')::interval
-        WHERE u.active
+        WHERE u.active AND u.platform_user_id IS NULL
         GROUP BY u.id ORDER BY assigned DESC NULLS LAST, u.name`,
       [days],
     )

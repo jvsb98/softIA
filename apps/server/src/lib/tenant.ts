@@ -17,6 +17,10 @@ export interface TenantCtx {
   schema: string
   name: string
   status: string
+  /** módulos ligados pelo fornecedor (ver platform/modules.ts) */
+  modules?: Record<string, { enabled: boolean; config: Record<string, any> }>
+  /** limites contratados (ver platform/modules.ts) */
+  limits?: Record<string, any>
 }
 
 export interface PlatformCtx {

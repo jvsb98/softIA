@@ -4,6 +4,8 @@
  *   npm run cli -- check                   testa a configuração e a conexão com o banco
  *   npm run cli -- tenant:create <slug> --name "Clínica X" --admin-name "Ana" --admin-email ana@x.com [--segment clinica] [--password ...]
  *                                          cria um cliente (schema, subdomínio e administrador)
+ *   npm run cli -- platform:create-admin --name "João" --email joao@x.com [--password ...] [--role admin|implantador|suporte]
+ *                                          cria alguém da equipe do fornecedor (o primeiro super admin nasce aqui)
  *   npm run cli -- tenant:list             lista os clientes
  *   npm run cli -- tenant:status <slug> <implantacao|ativo|suspenso|cancelado>
  *   npm run cli -- reset-admin <e-mail> --tenant <slug>   gera senha temporária e remove o 2FA de um usuário
@@ -164,6 +166,32 @@ async function main() {
       })
       break
     }
+    case 'platform:create-admin': {
+      const name = flag(args, 'name')
+      const email = flag(args, 'email')
+      const role = flag(args, 'role') ?? 'admin'
+      if (!name || !email) throw new Error('Uso: platform:create-admin --name "Nome" --email email@empresa.com [--password ...] [--role admin|implantador|suporte]')
+      if (!['admin', 'implantador', 'suporte'].includes(role)) throw new Error('Perfil inválido: use admin, implantador ou suporte.')
+      await withDb(async () => {
+        await migrate()
+        const { hashPassword } = await import('./auth/service.js')
+        const pass = flag(args, 'password')
+        const temp = pass ? null : `Temp-${randomToken(8)}1`
+        await withPlatform(async () => {
+          if (await one(`SELECT 1 FROM users WHERE lower(email)=lower($1)`, [email])) throw new Error('Já existe alguém da equipe com este e-mail.')
+          await q(`INSERT INTO users(name, email, password_hash, role, must_change_password) VALUES ($1, lower($2), $3, $4, $5)`, [
+            name,
+            email,
+            await hashPassword(pass ?? temp!),
+            role,
+            !!temp,
+          ])
+        })
+        console.log(`Equipe do fornecedor: ${name} <${email}> (${role}) criado.`)
+        if (temp) console.log(`Senha temporária: ${temp}  ·  no primeiro acesso ao painel: nova senha e verificação em duas etapas.`)
+      })
+      break
+    }
     case 'tenant:list': {
       await withDb(async () => {
         const rows = await withPlatform(() =>
@@ -218,7 +246,7 @@ async function main() {
     }
     default:
       console.log(
-        'Comandos: migrate | check | tenant:create | tenant:list | tenant:status | reset-admin <e-mail> --tenant <slug> | export-key | import-key <base64> | backup --out <pasta> [--keep 14] | seed-demo --tenant <slug>',
+        'Comandos: migrate | check | platform:create-admin | tenant:create | tenant:list | tenant:status | reset-admin <e-mail> --tenant <slug> | export-key | import-key <base64> | backup --out <pasta> [--keep 14] | seed-demo --tenant <slug>',
       )
   }
 }

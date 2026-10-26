@@ -37,11 +37,14 @@ let dummyHash: string | undefined
 export const LOCK_THRESHOLD = 5
 export const LOCK_MINUTES = 15
 
-export function effectivePermissions(role: Role, p: Permissions): Required<Permissions> {
-  if (role === 'admin') return { flowsAdvanced: true, flowsEdit: true, kbEdit: true, reports: true }
-  if (role === 'supervisor')
-    return { flowsAdvanced: !!p.flowsAdvanced, flowsEdit: p.flowsEdit ?? true, kbEdit: p.kbEdit ?? true, reports: p.reports ?? true }
-  return { flowsAdvanced: false, flowsEdit: !!p.flowsEdit, kbEdit: !!p.kbEdit, reports: !!p.reports }
+/**
+ * Permissões efetivas. SaaS: nós avançados (código, HTTP livre) ficam só com a equipe do fornecedor,
+ * numa sessão de "entrar como cliente" (platformSession), nunca com os usuários do cliente.
+ */
+export function effectivePermissions(role: Role, p: Permissions, platformSession = false): Required<Permissions> {
+  if (role === 'admin') return { flowsAdvanced: platformSession, flowsEdit: true, kbEdit: true, reports: true }
+  if (role === 'supervisor') return { flowsAdvanced: platformSession, flowsEdit: p.flowsEdit ?? true, kbEdit: p.kbEdit ?? true, reports: p.reports ?? true }
+  return { flowsAdvanced: platformSession, flowsEdit: !!p.flowsEdit, kbEdit: !!p.kbEdit, reports: !!p.reports }
 }
 
 export async function hashPassword(pw: string) {
@@ -86,6 +89,8 @@ export interface ResolvedSession {
   sessionId: string
   user: SessionUser
   mfaPending: boolean
+  /** sessão aberta pela equipe do fornecedor ("entrar como cliente") */
+  impersonation: { by: string; byName: string | null; reason: string | null; expiresAt: string } | null
 }
 
 const touchCache = new Map<string, number>()
@@ -94,7 +99,10 @@ export async function resolveSession(token: string | undefined): Promise<Resolve
   if (!token) return null
   const id = sha256(token)
   const s = await one<any>(
-    `SELECT id, user_id, mfa_pending FROM user_sessions WHERE id=$1 AND revoked_at IS NULL AND expires_at > now()`,
+    `SELECT id, user_id, mfa_pending, expires_at, impersonated_by, impersonated_by_name, impersonation_reason
+       FROM user_sessions WHERE id=$1 AND revoked_at IS NULL AND expires_at > now()
+        -- acesso do fornecedor: cai na hora se a pessoa da equipe for desativada
+        AND (impersonated_by IS NULL OR EXISTS (SELECT 1 FROM plataforma.users pu WHERE pu.id = user_sessions.impersonated_by AND pu.active))`,
     [id],
   )
   if (!s) return null
@@ -102,7 +110,8 @@ export async function resolveSession(token: string | undefined): Promise<Resolve
   if (!user) return null
   // Expiração deslizante (atualiza no máximo 1x por minuto por sessão).
   const last = touchCache.get(id) ?? 0
-  if (!s.mfa_pending && Date.now() - last > 60_000) {
+  // Sessão do fornecedor não desliza: vale no máximo as 2 horas definidas ao entrar
+  if (!s.mfa_pending && !s.impersonated_by && Date.now() - last > 60_000) {
     if (touchCache.size > 20_000) touchCache.clear() // limite: muitas sessões não crescem a memória sem fim
     touchCache.set(id, Date.now())
     const sec = await getSetting('security', { sessionHours: 12 })
@@ -112,7 +121,10 @@ export async function resolveSession(token: string | undefined): Promise<Resolve
     ).catch(() => {})
     void q(`UPDATE users SET last_seen_at=now() WHERE id=$1`, [user.id]).catch(() => {})
   }
-  return { sessionId: id, user, mfaPending: s.mfa_pending }
+  const impersonation = s.impersonated_by
+    ? { by: s.impersonated_by, byName: s.impersonated_by_name, reason: s.impersonation_reason, expiresAt: new Date(s.expires_at).toISOString() }
+    : null
+  return { sessionId: id, user, mfaPending: s.mfa_pending, impersonation }
 }
 
 export async function revokeSession(sessionId: string) {
