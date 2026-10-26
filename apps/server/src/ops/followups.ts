@@ -26,7 +26,7 @@ interface Attempt {
 const DEFAULTS = {
   enabled: true,
   onlyBusinessHours: true,
-  hoursSectorSlug: 'sdr',
+  hoursSectorSlug: 'atendimento',
   applyTo: 'automation' as 'automation' | 'all',
   attempts: [] as Attempt[],
   autoCloseAfterHours: 48,
@@ -47,14 +47,14 @@ async function aiFollowup(conversationId: string, fallback: string) {
   )
   const transcript = rows
     .reverse()
-    .map((r) => `${r.direction === 'in' ? 'Contato' : 'Nimber'}: ${r.body}`)
+    .map((r) => `${r.direction === 'in' ? 'Contato' : 'Empresa'}: ${r.body}`)
     .join('\n')
   try {
     const r = await runChat(
       'summary',
       {
         system:
-          'Escreva UMA mensagem curta e cordial de retomada para um contato que parou de responder no WhatsApp da Nimber (investimentos em imóveis tokenizados), retomando o último assunto. Sem pressão, sem promessas de rentabilidade, no máximo 2 frases. Responda só com a mensagem.',
+          'Escreva UMA mensagem curta e cordial de retomada para um contato que parou de responder no WhatsApp da empresa, retomando o último assunto. Sem pressão, sem promessas, no máximo 2 frases. Responda só com a mensagem.',
         messages: [{ role: 'user', content: transcript || '(sem histórico)' }],
         mockHint: 'agent',
         timeoutMs: 20_000,

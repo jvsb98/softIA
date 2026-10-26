@@ -1,5 +1,5 @@
 -- =====================================================================
--- Nimber Atende · 002 · Inteligência artificial
+-- softIA · schema do cliente · 002 · Inteligência artificial
 -- =====================================================================
 
 CREATE TABLE ai_providers (
@@ -130,28 +130,19 @@ SELECT t.task, p.id, 'simulado', t.temp, t.mx
  WHERE p.kind='mock';
 
 INSERT INTO ai_agents (name, persona, objective, instructions, greeting, is_default) VALUES (
-  'Assistente Nimber',
-  'Você é o assistente virtual da Nimber, plataforma brasileira de tokenização de ativos imobiliários (RWA). Fala português do Brasil, com tom cordial, claro e profissional — sem gírias e sem exageros comerciais. Mensagens curtas, como numa conversa de WhatsApp: no máximo 3 parágrafos curtos e uma pergunta por vez.',
-  'Tirar dúvidas sobre a Nimber e sobre investimento em ativos tokenizados usando somente a base de conhecimento, entender o interesse do contato e qualificar o lead conforme os critérios, transferindo para um especialista humano quando for o momento.',
-  E'- Apresente-se como assistente virtual da Nimber na primeira mensagem.\n- Responda dúvidas com base apenas no CONTEXTO DA BASE DE CONHECIMENTO. Se a resposta não estiver lá, diga que vai confirmar com um especialista e transfira.\n- Durante a conversa, colete naturalmente os critérios de qualificação ainda não preenchidos (uma pergunta por vez, sem parecer um formulário).\n- Use a ferramenta registrar_criterios sempre que o contato informar algo que responda a um critério.\n- Se o contato já for investidor e o assunto for a conta dele (acesso, extrato, rendimentos, resgate), transfira para o Suporte.\n- Nunca peça senha, código de verificação ou dados bancários.',
+  'Assistente virtual',
+  'Você é o assistente virtual da empresa no WhatsApp. Fala português do Brasil, com tom cordial, claro e profissional, sem gírias e sem exageros comerciais. Mensagens curtas, como numa conversa de WhatsApp: no máximo 3 parágrafos curtos e uma pergunta por vez.',
+  'Tirar dúvidas usando somente a base de conhecimento, entender o que o contato precisa e encaminhar para uma pessoa do time quando for o momento.',
+  E'- Apresente-se como assistente virtual na primeira mensagem.\n- Responda dúvidas com base apenas no CONTEXTO DA BASE DE CONHECIMENTO. Se a resposta não estiver lá, diga que vai confirmar com o time e transfira.\n- Faça uma pergunta por vez, sem parecer um formulário.\n- Nunca peça senha, código de verificação ou dados bancários.',
   NULL,
   true
 );
 
-INSERT INTO qualification_criteria (key, label, question, description, type, options, weight, sort) VALUES
- ('experiencia', 'Experiência com investimentos', 'Você já investe hoje? Em quê, por exemplo renda fixa, fundos ou imóveis?',
-  'Classifique a experiência declarada do contato com investimentos.', 'choice',
-  '[{"value":"nenhuma","label":"Ainda não investe","points":2},{"value":"renda_fixa","label":"Renda fixa / poupança","points":5},{"value":"fundos_acoes","label":"Fundos, ações ou FIIs","points":8},{"value":"imoveis","label":"Já investe em imóveis","points":10}]', 1, 1),
- ('valor', 'Valor que pretende investir (R$)', 'Quanto você pensa em investir nesse primeiro momento, aproximadamente?',
-  'Valor em reais que o contato pretende investir. Converta "50 mil" em 50000.', 'number',
-  '[{"min":0,"max":4999,"points":2},{"min":5000,"max":29999,"points":6},{"min":30000,"max":99999,"points":10},{"min":100000,"max":null,"points":14}]', 1, 2),
- ('prazo', 'Quando pretende investir', 'E você pensa em investir quando: agora, nos próximos meses ou ainda está pesquisando?',
-  'Horizonte de decisão do contato.', 'choice',
-  '[{"value":"agora","label":"Agora / este mês","points":8},{"value":"meses","label":"Próximos 3 meses","points":5},{"value":"pesquisando","label":"Só pesquisando","points":1}]', 1, 3);
+-- Critérios de qualificação vêm do modelo de segmento; nenhum por padrão.
 
 INSERT INTO settings (key, value) VALUES
  ('ai',            '{"enabled":true,"historyMessages":24}'),
- ('qualification', '{"enabled":true,"threshold":22,"targetSectorSlug":"closer","disqualifyBelow":null}'),
- ('handoff',       '{"explicitRequest":true,"qualified":true,"noAnswer":true,"sensitive":true,"frustration":true,"failures":true,"failureLimit":2,"existingCustomer":true,"supportSectorSlug":"suporte","legalSectorSlug":"juridico"}'),
- ('compliance',    '{"guardEnabled":true,"appendDisclaimer":true,"disclaimer":"As informações compartilhadas aqui têm caráter exclusivamente informativo e não constituem recomendação de investimento. Investimentos em ativos tokenizados envolvem riscos, inclusive de perda do capital investido, e rentabilidade passada ou projetada não é garantia de resultados futuros. Antes de investir, leia os documentos da oferta disponíveis na plataforma Nimber.","disclaimerTriggers":["rentabilidade","retorno","rendimento","valoriza","lucro","tir","yield","dividend","% ao ano","% a.a"]}')
+ ('qualification', '{"enabled":false,"threshold":22,"targetSectorSlug":"comercial","disqualifyBelow":null}'),
+ ('handoff',       '{"explicitRequest":true,"qualified":true,"noAnswer":true,"sensitive":true,"frustration":true,"failures":true,"failureLimit":2,"existingCustomer":true,"supportSectorSlug":"suporte","legalSectorSlug":"suporte"}'),
+ ('compliance',    '{"guardEnabled":false,"prefilterEnabled":false,"appendDisclaimer":false,"disclaimer":"","disclaimerTriggers":[]}')
 ON CONFLICT (key) DO NOTHING;

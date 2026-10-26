@@ -1,5 +1,5 @@
 -- =====================================================================
--- Nimber Atende · 004 · Integrações, follow-ups, feriados e webhooks
+-- softIA · schema do cliente · 004 · Integrações, follow-ups, feriados e webhooks
 -- =====================================================================
 
 CREATE TABLE external_databases (
@@ -93,6 +93,6 @@ ON CONFLICT (day) DO NOTHING;
 CREATE INDEX conversations_followup_idx ON conversations(status, last_outbound_at) WHERE status <> 'closed';
 
 INSERT INTO settings (key, value) VALUES
- ('followups', '{"enabled":true,"onlyBusinessHours":true,"hoursSectorSlug":"sdr","applyTo":"automation","attempts":[{"afterHours":24,"message":"Oi, {{nome}}! Passando para saber se ficou alguma dúvida sobre a Nimber. Posso te ajudar com algo?","useAi":false},{"afterHours":72,"message":"{{nome}}, sigo por aqui caso queira retomar a conversa sobre investimentos com a Nimber. É só responder esta mensagem.","useAi":false}],"autoCloseAfterHours":48,"optOutKeywords":["parar","sair","pare","nao quero mais","não quero mais","remover","descadastrar"]}'),
+ ('followups', '{"enabled":true,"onlyBusinessHours":true,"hoursSectorSlug":"atendimento","applyTo":"automation","attempts":[{"afterHours":24,"message":"Oi, {{nome}}! Passando para saber se ficou alguma dúvida. Posso te ajudar com algo?","useAi":false},{"afterHours":72,"message":"{{nome}}, sigo por aqui caso queira retomar a conversa. É só responder esta mensagem.","useAi":false}],"autoCloseAfterHours":48,"optOutKeywords":["parar","sair","pare","nao quero mais","não quero mais","remover","descadastrar"]}'),
  ('notifications', '{"slackWebhookUrl":"","notifyConnectionDown":true,"notifyComplianceBlock":true}')
 ON CONFLICT (key) DO NOTHING;

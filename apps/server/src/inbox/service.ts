@@ -3,7 +3,7 @@
  */
 import type pg from 'pg'
 import { one, q, tx, type Queryable } from '../lib/db.js'
-import { enqueue } from '../lib/jobs.js'
+import { cancelGroup, enqueue } from '../lib/jobs.js'
 import { log } from '../lib/logger.js'
 import { emitConversation, emitUser, isOnline } from '../http/realtime.js'
 import { holidaySet, isWithinHours } from '../ops/hours.js'
@@ -390,7 +390,7 @@ export async function transfer(
   })
   // Cancela automações pendentes da conversa (fluxo/IA) — o humano assume.
   await q(`UPDATE flow_runs SET status='cancelled', ended_at=now(), error='transferida' WHERE conversation_id=$1 AND status IN ('running','waiting')`, [conversationId]).catch(() => {})
-  await q(`UPDATE jobs SET status='done', finished_at=now(), last_error='cancelado: transferência' WHERE status='queued' AND group_key=$1 AND queue='conversation.process'`, [`conv:${conversationId}`])
+  await cancelGroup(`conv:${conversationId}`, 'transferência', 'conversation.process')
   const fresh = (await getConversation(conversationId))!
   if (target.userId) {
     await assign(conversationId, target.userId, actor)
@@ -428,9 +428,7 @@ export async function closeConversation(conversationId: string, actor: Actor, re
   )
   if (!conv) return null
   await q(`UPDATE flow_runs SET status='cancelled', ended_at=now(), error='encerrada' WHERE conversation_id=$1 AND status IN ('running','waiting')`, [conversationId]).catch(() => {})
-  await q(`UPDATE jobs SET status='done', finished_at=now(), last_error='cancelado: encerramento' WHERE status='queued' AND group_key=$1`, [
-    `conv:${conversationId}`,
-  ])
+  await cancelGroup(`conv:${conversationId}`, 'encerramento')
   await logEvent(conversationId, 'conversation.closed', actor, { reason: reason ?? null })
   void import('../integrations/webhooks.js').then((w) => w.fireEvent('conversation.closed', { conversationId, reason })).catch(() => {})
   return broadcastConversation(conversationId)

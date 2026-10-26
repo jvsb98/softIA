@@ -1,7 +1,7 @@
 {
-  "name": "@nimber-atende/server",
+  "name": "@softia/server",
   "private": true,
-  "version": "1.0.4",
+  "version": "0.1.0",
   "type": "module",
   "main": "dist/index.js",
   "scripts": {
@@ -39,6 +39,7 @@
     "pino": "^10.4.0",
     "qrcode": "^1.5.4",
     "socket.io": "^4.8.4",
+    "undici": "^6.29.1",
     "unpdf": "^1.9.0",
     "zod": "^4.6.7"
   }

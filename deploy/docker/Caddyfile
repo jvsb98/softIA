@@ -1,20 +1,7 @@
-# HTTPS automático (Let's Encrypt) na frente do Nimber Atende.
-# O domínio vem da variável DOMAIN do .env; o DNS precisa apontar para o Droplet antes de subir.
-{$DOMAIN} {
-	encode zstd gzip
-
-	header {
-		Strict-Transport-Security "max-age=31536000; includeSubDomains"
-		-Server
-	}
-
-	# WebSocket (Socket.IO) é repassado automaticamente
-	reverse_proxy app:8080 {
-		header_up X-Real-IP {remote_host}
-	}
-
-	log {
-		output stdout
-		format console
-	}
+# Caddy PRÓPRIO do softIA (droplet dedicado). No droplet compartilhado com a Central, use
+# deploy/caddy/softia.global + softia.site importados pelo Caddy que já existe (ver docs/DEPLOY.md).
+{
+	import /etc/caddy/softia.global
 }
+
+import /etc/caddy/softia.site

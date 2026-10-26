@@ -1,87 +1,76 @@
-# Nimber Atende
+# softIA
 
-Atendimento no WhatsApp com IA para a Nimber: o agente de IA qualifica leads, tira dúvidas sobre a plataforma de tokenização e passa a conversa para a pessoa certa (SDR, Closer, Suporte), com vários atendentes no mesmo número, vários números e um construtor visual de fluxos.
+SaaS white label de atendimento no WhatsApp para pequenas empresas (marmorarias, clínicas, consultórios): conexão por QR Code, inbox multiatendente, fluxos de atendimento, IA, agenda e CRM. Cada cliente acessa pelo próprio subdomínio (`<cliente>.connectawork.app.br`), com dados isolados num schema próprio do PostgreSQL. O fornecedor monta e libera os módulos de cada cliente.
 
-Roda no próprio servidor da Nimber (Windows, como serviço) e depois na DigitalOcean (Docker), com o banco PostgreSQL apontado por um arquivo de texto.
+Nasceu como fork do **Nimber Atende 1.0.4** (histórico preservado; as tags antigas têm o prefixo `atende-`). O documento de arquitetura e o roadmap ficam no projeto do claude.ai: "SaaS de Atendimento WhatsApp — Arquitetura (Fase 0)".
 
----
+## Situação
 
-## O que tem
-
-| Área | Recursos |
-|---|---|
-| **WhatsApp** | Conexão nativa por QR Code (Baileys, mesmo núcleo do Extrator de Integrantes, com a correção de pareamento). Vários números. O número continua no celular da equipe: quando alguém responde pelo celular, a IA pausa naquela conversa. Ritmo de envio humano (digitando…, intervalos, limite por minuto). |
-| **Caixa de entrada** | Multiatendente em tempo real, filas por setor, distribuição (rodízio, menos ocupado ou puxar da fila), transferência com motivo, notas internas com @menção, respostas rápidas com "/", etiquetas, mídia (áudio, imagem, documento), conversas iniciadas pelo atendente. |
-| **IA** | Vários provedores (Anthropic, OpenAI, Gemini, compatíveis) com modelo por tarefa e reserva automática. Qualificação híbrida com score, base de conhecimento (documentos, FAQ, site) com busca por palavras e por significado, transcrição de áudio, sugestão de resposta e resumo para o atendente. |
-| **Compliance** | Três travas em camadas — sem promessa de rentabilidade, sem recomendação personalizada, sem orientação jurídica/tributária. Resposta bloqueada não sai, vira transferência para humano e fica auditada. Disclaimer automático. |
-| **Fluxos** | Construtor visual (estilo n8n) com 19 tipos de nó, rascunho/publicado, versões com restauração, validação antes de publicar, simulador e métricas por nó. Permissões: negócio monta fluxos, tecnologia libera nós avançados (HTTP, código). |
-| **Integrações** | Consultas somente leitura a PostgreSQL/MySQL/SQL Server (ex.: ofertas abertas, carteira do investidor) usadas pela IA e pelos fluxos, com verificação de identidade antes de dados pessoais e máscaras LGPD. Webhooks assinados (n8n, CRM). Alertas no Slack. Follow-ups automáticos com opt-out. |
-| **Gestão** | Relatórios (volume, automação, transferências, funil, tempos por setor e atendente, mapa de calor, uso da IA), horários e feriados, auditoria, retenção e anonimização (LGPD). |
-| **Acesso** | Login próprio com 2FA (TOTP) obrigatório para administradores, códigos de recuperação, bloqueio por tentativas, sessões revogáveis. Navegador ou app desktop para Windows (bandeja, notificações nativas, contador na barra de tarefas). |
-
----
+| Fase | Conteúdo | Situação |
+|---|---|---|
+| 0 | Arquitetura e inventário | Concluída |
+| 1 | Fundação multi-cliente: schema por cliente, contexto por subdomínio, fila/tempo real/WhatsApp por cliente, deploy no Droplet compartilhado | **Esta versão (0.1.0)** |
+| 2 | Painel do fornecedor: perfis, criar cliente em 5 passos, módulos e limites, white label, entrar como cliente, medidor de IA | Próxima |
+| 3 | Agenda (Google e Microsoft, profissionais + serviços, lembretes) | — |
+| 4 | CRM em funil (portado da Central WhatsApp) e modelos de segmento → piloto | — |
+| 5 | Disparo pela Z-API | — |
+| 6 | Operação: backup por cliente, alertas, manuais | — |
 
 ## Guias
 
 | Para… | Leia |
 |---|---|
-| Subir este pacote para o GitHub e gerar os instaladores | [docs/COMO-SUBIR-NO-GITHUB.md](docs/COMO-SUBIR-NO-GITHUB.md) |
-| Instalar no servidor Windows da Nimber | [docs/GUIA-INSTALACAO-WINDOWS.md](docs/GUIA-INSTALACAO-WINDOWS.md) |
-| Levar para a DigitalOcean | [docs/GUIA-DIGITALOCEAN.md](docs/GUIA-DIGITALOCEAN.md) |
-| Usar no dia a dia (atendentes, supervisores, admins) | [docs/GUIA-USO.md](docs/GUIA-USO.md) |
+| Subir no Droplet da Central com banco no Supabase | [docs/DEPLOY.md](docs/DEPLOY.md) |
+| Entender o multi-cliente (regras para quem mexe no código) | [docs/MULTI-CLIENTE.md](docs/MULTI-CLIENTE.md) |
+| Usar no dia a dia (atendentes, supervisores, admins do cliente) | [docs/GUIA-USO.md](docs/GUIA-USO.md) |
 | Segurança e LGPD | [docs/SEGURANCA-LGPD.md](docs/SEGURANCA-LGPD.md) |
-| Arquitetura e decisões | [docs/ARQUITETURA.md](docs/ARQUITETURA.md) |
-| Tabelas do banco | [docs/MODELO-DE-DADOS.md](docs/MODELO-DE-DADOS.md) |
+| Tabelas do schema de cada cliente | [docs/MODELO-DE-DADOS.md](docs/MODELO-DE-DADOS.md) |
 | O que mudou em cada versão | [CHANGELOG.md](CHANGELOG.md) |
-
----
 
 ## Estrutura
 
 ```
-nimber-atende/
+softia/
 ├─ apps/
-│  ├─ server/        Servidor Node.js 22 + TypeScript (Fastify, Socket.IO, Baileys, PostgreSQL)
-│  │  ├─ migrations/ SQL versionado (aplicado sozinho na inicialização)
-│  │  └─ src/        auth · whatsapp · inbox · ai · flows · integrations · ops · http
-│  ├─ web/           Painel React 19 + Vite + Tailwind 4 (servido pelo próprio servidor)
-│  └─ desktop/       App desktop Electron (Windows)
-├─ config/           Modelos de database.txt e server.txt (os reais nunca vão para o Git)
+│  ├─ server/              Node.js 22 + TypeScript (Fastify, Socket.IO, Baileys, PostgreSQL)
+│  │  ├─ migrations/
+│  │  │  ├─ platform/      schema "plataforma": clientes, domínios, fila, leases do WhatsApp
+│  │  │  └─ tenant/        schema de cada cliente (t_<slug>): tudo o que o Atende já tinha
+│  │  ├─ scripts/          test-isolation.mjs (dois clientes, nenhum dado cruzado)
+│  │  └─ src/              lib/tenant.ts (contexto) · platform/ · auth · whatsapp · inbox · ai · flows · integrations · ops · http
+│  └─ web/                 Painel React 19 + Vite + Tailwind 4 (servido pelo próprio servidor)
 ├─ deploy/
-│  ├─ windows/       Instalador Inno Setup + serviço WinSW + script de build
-│  └─ docker/        Dockerfile, docker-compose (Postgres opcional) e Caddy (HTTPS)
-├─ patches/          Correção do Baileys para o pareamento por QR Code (aplicada no npm install)
-├─ scripts/          Empacotamento do servidor e troca de versão
-└─ .github/workflows CI, instaladores Windows e imagem Docker
+│  ├─ docker/              Dockerfile, compose (dedicado ou compartilhado), .env.example
+│  ├─ caddy/               softia.global + softia.site (on-demand TLS por subdomínio)
+│  └─ central/             patch do Caddy da Central para importar os trechos acima
+├─ patches/                Correção do Baileys para o pareamento por QR Code
+└─ .github/workflows       CI (inclui o teste de isolamento) e imagem Docker (GHCR)
 ```
-
----
 
 ## Rodar em desenvolvimento
 
-Pré-requisitos: Node.js 22, PostgreSQL 14+ (com pgvector, se possível) e Git.
+Pré-requisitos: Node.js 22 e PostgreSQL 14+ (com pgvector, se possível).
 
 ```bash
-npm install                                  # instala tudo e aplica o patch do Baileys
-cp config/database.example.txt config/database.txt   # preencha HOST, PORT, DATABASE, USER, PASSWORD
-npm run migrate                              # cria as tabelas
-npm run dev:server                           # API em http://localhost:8080
-npm run dev:web                              # painel em http://localhost:5173 (com recarga automática)
+npm install
+export NIMBER_DB_HOST=localhost NIMBER_DB_NAME=softia NIMBER_DB_USER=postgres NIMBER_DB_PASSWORD=...
+export BASE_DOMAIN=localhost PUBLIC_URL=http://painel.localhost:8080
+npm run migrate
+npm run cli -w apps/server -- tenant:create alfa --name "Marmoraria Alfa" --admin-name Ana --admin-email ana@alfa.com --password SenhaAlfa123
+npm run dev:server        # API na porta 8080
+npm run dev:web           # painel: abra http://alfa.localhost:5173  (o subdomínio diz qual cliente é)
 ```
 
-Na primeira vez, o painel pede para criar o administrador e configurar o 2FA. Sem chave de IA, o provedor **Simulado** responde de forma heurística para testar fluxos e telas sem custo. Para popular conversas de exemplo: `npm run cli -w apps/server -- seed-demo`.
+Navegadores resolvem `*.localhost` para a própria máquina, então cada cliente de teste tem o seu endereço local (`alfa.localhost`, `beta.localhost`). Dados de exemplo: `npm run cli -w apps/server -- seed-demo --tenant alfa`.
 
 | Comando | O que faz |
 |---|---|
 | `npm run typecheck` | Verifica tipos do servidor e do painel |
-| `npm test` | Testes unitários (TOTP, compliance, qualificação, base de conhecimento, consultas, rede) |
+| `npm test` | Testes unitários |
 | `npm run build` | Compila painel e servidor |
-| `npm run package:server` | Monta `out/nimber-atende/` (servidor + painel + dependências de produção) |
-| `node scripts/set-version.mjs 1.1.0` | Troca a versão em todos os pacotes |
-| `npm run cli -w apps/server -- <comando>` | `check`, `migrate`, `reset-admin <e-mail>`, `export-key`, `import-key`, `seed-demo` |
-
----
+| `node apps/server/scripts/test-isolation.mjs` | Teste ponta a ponta de isolamento (servidor rodando; veja o cabeçalho do arquivo) |
+| `npm run cli -w apps/server -- <comando>` | `migrate`, `check`, `tenant:create`, `tenant:list`, `tenant:status`, `reset-admin --tenant`, `seed-demo --tenant`, `export-key`, `import-key`, `backup` |
 
 ## Licença
 
-Uso interno da Nimber. Todos os direitos reservados.
+Uso restrito. Todos os direitos reservados.

@@ -2,7 +2,8 @@ import tailwindcss from '@tailwindcss/vite'
 import react from '@vitejs/plugin-react'
 import { defineConfig } from 'vite'
 
-// Em desenvolvimento o Vite repassa /api e /socket.io para o servidor (porta 8080).
+// Em desenvolvimento o Vite repassa /api e /socket.io para o servidor (porta 8080), mantendo o Host:
+// abra http://<slug-do-cliente>.localhost:5173 para o servidor saber de qual cliente é a tela.
 export default defineConfig({
   plugins: [react(), tailwindcss()],
   server: {

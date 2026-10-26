@@ -1,46 +1,59 @@
 # =====================================================================
-#  Nimber Atende — Docker Compose (DigitalOcean Droplet ou qualquer Linux)
+#  softIA — Docker Compose
 #
-#  1) cp .env.example .env   e preencha
-#  2) Com banco gerenciado da DigitalOcean (recomendado):
-#        docker compose --profile https up -d
-#     Com PostgreSQL no próprio servidor (contêiner):
-#        docker compose --profile local-db --profile https up -d
-#     Sem HTTPS (só testes na rede interna):
-#        docker compose --profile local-db up -d   → http://IP:8080
-#  Guia completo: docs/GUIA-DIGITALOCEAN.md
+#  Droplet COMPARTILHADO com a Central WhatsApp (o Caddy da Central atende 80/443):
+#     cp .env.example .env   (preencha)
+#     docker compose -f docker-compose.yml -f docker-compose.compartilhado.yml pull
+#     docker compose -f docker-compose.yml -f docker-compose.compartilhado.yml up -d
+#
+#  Droplet DEDICADO (Caddy próprio; com Postgres no próprio servidor, some --profile local-db):
+#     docker compose --profile caddy up -d
+#
+#  Guia completo: docs/DEPLOY.md
 # =====================================================================
-name: nimber-atende
+name: softia
 
 services:
-  app:
-    image: ${NIMBER_IMAGE:-ghcr.io/nimber/nimber-atende:latest}
+  softia:
+    image: ${SOFTIA_IMAGE:-ghcr.io/jvsb98/softia:main}
     build:
       context: ../..
       dockerfile: deploy/docker/Dockerfile
     restart: unless-stopped
     environment:
+      # Banco (Supabase: use o pooler em MODO SESSÃO, porta 5432 — nunca o modo transação, 6543)
       NIMBER_DB_HOST: ${NIMBER_DB_HOST:-db}
       NIMBER_DB_PORT: ${NIMBER_DB_PORT:-5432}
-      NIMBER_DB_NAME: ${NIMBER_DB_NAME:-nimber_atende}
-      NIMBER_DB_USER: ${NIMBER_DB_USER:-nimber_atende}
+      NIMBER_DB_NAME: ${NIMBER_DB_NAME:-postgres}
+      NIMBER_DB_USER: ${NIMBER_DB_USER:-postgres}
       NIMBER_DB_PASSWORD: ${NIMBER_DB_PASSWORD:?defina NIMBER_DB_PASSWORD no .env}
       NIMBER_DB_SSL: ${NIMBER_DB_SSL:-false}
       NIMBER_DB_SSL_CA: ${NIMBER_DB_SSL_CA:-}
+      NIMBER_DB_POOL_MAX: ${NIMBER_DB_POOL_MAX:-10}
       NIMBER_MASTER_KEY: ${NIMBER_MASTER_KEY:-}
-      PUBLIC_URL: ${PUBLIC_URL:-http://localhost:8080}
-      TRUST_PROXY: ${TRUST_PROXY:-true}
+      # Endereços: clientes em <slug>.BASE_DOMAIN, painel do fornecedor em PLATFORM_HOST
+      BASE_DOMAIN: ${BASE_DOMAIN:?defina BASE_DOMAIN no .env, por exemplo connectawork.app.br}
+      PLATFORM_HOST: ${PLATFORM_HOST:-}
+      PUBLIC_URL: ${PUBLIC_URL:?defina PUBLIC_URL no .env, por exemplo https://painel.connectawork.app.br}
+      TRUST_PROXY: "true"
       LOG_LEVEL: ${LOG_LEVEL:-info}
+      NODE_ENV: production
+      # Limite de memória do Node abaixo do limite do contêiner (o contêiner nunca derruba o servidor)
+      NODE_OPTIONS: --max-old-space-size=${SOFTIA_HEAP_MB:-512}
       TZ: America/Sao_Paulo
+    # Protege o que mais roda no Droplet (ex.: Central): se o softIA passar disso, só ele reinicia
+    mem_limit: ${SOFTIA_MEM_LIMIT:-900m}
     volumes:
-      - nimber_config:/config
-      - nimber_data:/data
-      # Banco gerenciado da DigitalOcean: baixe o "CA certificate" para esta pasta, descomente a linha
-      # abaixo e use NIMBER_DB_SSL=true e NIMBER_DB_SSL_CA=ca-certificate.crt no .env
-      # - ./ca-certificate.crt:/config/ca-certificate.crt:ro
+      - softia_config:/config
+      - softia_data:/data
+      # Banco com certificado próprio: coloque o arquivo nesta pasta e use NIMBER_DB_SSL_CA=ca.crt
+      # - ./ca.crt:/config/ca.crt:ro
     ports:
-      # Com o perfil https o Caddy publica 80/443; esta porta fica só para acesso local/SSH
-      - "${APP_BIND:-127.0.0.1}:8080:8080"
+      # Só para acesso local/SSH (curl http://127.0.0.1:8080/api/health); o público entra pelo Caddy
+      - "127.0.0.1:${SOFTIA_LOCAL_PORT:-8080}:8080"
+    logging:
+      driver: json-file
+      options: { max-size: "10m", max-file: "5" }
     depends_on:
       db:
         condition: service_healthy
@@ -51,8 +64,8 @@ services:
     profiles: ["local-db"]
     restart: unless-stopped
     environment:
-      POSTGRES_DB: ${NIMBER_DB_NAME:-nimber_atende}
-      POSTGRES_USER: ${NIMBER_DB_USER:-nimber_atende}
+      POSTGRES_DB: ${NIMBER_DB_NAME:-postgres}
+      POSTGRES_USER: ${NIMBER_DB_USER:-postgres}
       POSTGRES_PASSWORD: ${NIMBER_DB_PASSWORD:?defina NIMBER_DB_PASSWORD no .env}
       TZ: America/Sao_Paulo
     volumes:
@@ -65,24 +78,24 @@ services:
 
   caddy:
     image: caddy:2
-    profiles: ["https"]
+    profiles: ["caddy"]
     restart: unless-stopped
-    environment:
-      DOMAIN: "${DOMAIN:?defina DOMAIN no .env, por exemplo atende.nimber.com.br}"
     ports:
       - "80:80"
       - "443:443"
       - "443:443/udp"
     volumes:
       - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - ../caddy/softia.global:/etc/caddy/softia.global:ro
+      - ../caddy/softia.site:/etc/caddy/softia.site:ro
       - caddy_data:/data
       - caddy_config:/config
     depends_on:
-      - app
+      - softia
 
 volumes:
-  nimber_config:
-  nimber_data:
+  softia_config:
+  softia_data:
   pgdata:
   caddy_data:
   caddy_config:

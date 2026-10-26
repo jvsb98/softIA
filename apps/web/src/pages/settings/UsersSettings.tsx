@@ -28,7 +28,7 @@ export function UsersSettings() {
     <div>
       <PageHeader
         title="Usuários"
-        description="Quem acessa o Nimber Atende, com qual perfil e em quais setores."
+        description="Quem acessa o atendimento, com qual perfil e em quais setores."
         actions={
           isAdmin && (
             <Button variant="primary" icon={<Plus className="size-4" />} onClick={() => setEditing({ role: 'agent', active: true, sector_ids: [], permissions: {}, max_concurrent: 25 })}>

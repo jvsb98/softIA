@@ -12,7 +12,7 @@ export function ContactsPage() {
   const list = useQuery({ queryKey: ['contacts', search, status], queryFn: () => api.get<any[]>(`/api/contacts${qs({ search, status, limit: 200 })}`) })
   return (
     <div className="h-full overflow-y-auto px-8 py-8">
-      <PageHeader title="Contatos" description="Todas as pessoas que falaram com a Nimber pelo WhatsApp, com status de lead e etiquetas." />
+      <PageHeader title="Contatos" description="Todas as pessoas que falaram com a empresa pelo WhatsApp, com status de lead e etiquetas." />
       <div className="mb-4 flex gap-3">
         <div className="relative w-80">
           <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted" />

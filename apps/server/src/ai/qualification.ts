@@ -90,7 +90,7 @@ export function criteriaToolSchema(criteria: Criterion[]) {
  */
 export async function applyCriteria(contactId: string, values: Record<string, any>) {
   const criteria = await activeCriteria()
-  const settings = await getSetting('qualification', { enabled: true, threshold: 22, targetSectorSlug: 'closer', disqualifyBelow: null as number | null })
+  const settings = await getSetting('qualification', { enabled: true, threshold: 22, targetSectorSlug: 'comercial', disqualifyBelow: null as number | null })
   const contact = await one<any>(`SELECT lead_profile, lead_status FROM contacts WHERE id=$1`, [contactId])
   const profile = { ...(contact?.lead_profile ?? {}) }
   const valid = new Set(criteria.map((c) => c.key))
@@ -123,7 +123,7 @@ export async function applyCriteria(contactId: string, values: Record<string, an
 /** Versão em memória (simulador): mesmo cálculo, sem gravar no banco. */
 export async function applyCriteriaInMemory(contact: any, values: Record<string, any>) {
   const criteria = await activeCriteria()
-  const settings = await getSetting('qualification', { enabled: true, threshold: 22, targetSectorSlug: 'closer', disqualifyBelow: null as number | null })
+  const settings = await getSetting('qualification', { enabled: true, threshold: 22, targetSectorSlug: 'comercial', disqualifyBelow: null as number | null })
   const profile = { ...(contact.lead_profile ?? {}) }
   const valid = new Set(criteria.map((c) => c.key))
   for (const [k, v] of Object.entries(values ?? {})) if (valid.has(k) && v !== null && v !== undefined && v !== '') profile[k] = v

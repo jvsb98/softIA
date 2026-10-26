@@ -4,6 +4,8 @@
  */
 import { log } from '../lib/logger.js'
 import { getSetting } from './settings.js'
+import { safeFetch } from '../lib/net-guard.js'
+import { ctxKey, tenantOrNull } from '../lib/tenant.js'
 
 const lastSent = new Map<string, number>()
 
@@ -13,14 +15,14 @@ export async function notifyTeam(key: string, text: string, kind: 'connection' |
   if (kind === 'connection' && !cfg.notifyConnectionDown) return
   if (kind === 'compliance' && !cfg.notifyComplianceBlock) return
   // no máximo 1 alerta igual a cada 30 minutos
-  const prev = lastSent.get(key) ?? 0
+  const prev = lastSent.get(ctxKey() + key) ?? 0
   if (Date.now() - prev < 30 * 60_000) return
-  lastSent.set(key, Date.now())
+  lastSent.set(ctxKey() + key, Date.now())
   try {
-    await fetch(cfg.slackWebhookUrl, {
+    await safeFetch(cfg.slackWebhookUrl, {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ text: `*Nimber Atende* — ${text}` }),
+      body: JSON.stringify({ text: `*${tenantOrNull()?.name ?? 'softIA'}* — ${text}` }),
       signal: AbortSignal.timeout(8000),
     })
   } catch (err) {

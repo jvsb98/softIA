@@ -1,6 +1,6 @@
 /**
  * Webhooks de saída: avisam o n8n, o CRM da intranet ou outro sistema quando algo acontece.
- * Cada entrega é assinada (X-Nimber-Signature: sha256=<hmac>) e tem novas tentativas.
+ * Cada entrega é assinada (X-Webhook-Signature: sha256=<hmac>) e tem novas tentativas.
  */
 import { hmac } from '../lib/crypto.js'
 import { one, q } from '../lib/db.js'
@@ -71,7 +71,7 @@ async function deliver(job: Job<{ deliveryId: number }>) {
   try {
     const res = await safeFetch(d.url, {
       method: 'POST',
-      headers: { 'content-type': 'application/json', 'user-agent': 'NimberAtende-Webhook/1.0', 'x-nimber-event': d.event, 'x-nimber-signature': `sha256=${hmac(d.secret, body)}` },
+      headers: { 'content-type': 'application/json', 'user-agent': 'Webhook/1.0', 'x-webhook-event': d.event, 'x-webhook-signature': `sha256=${hmac(d.secret, body)}` },
       body,
       signal: AbortSignal.timeout(10_000),
     })

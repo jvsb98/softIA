@@ -11,12 +11,27 @@ import { ZodError } from 'zod'
 import { effectivePermissions, resolveSession, type ResolvedSession, type Role } from '../auth/service.js'
 import type { AppConfig } from '../lib/config.js'
 import { log } from '../lib/logger.js'
+import { runInCtx, withPlatform, type ExecCtx } from '../lib/tenant.js'
+import { normalizeHost, resolveHost } from '../platform/tenants.js'
 import { forbidden, HttpError, unauthorized } from './errors.js'
 
 declare module 'fastify' {
   interface FastifyRequest {
     session?: ResolvedSession | null
+    /** cliente (subdomínio) ou plataforma (painel do fornecedor) desta requisição */
+    execCtx?: ExecCtx
   }
+}
+
+/** Rotas internas atendidas em qualquer hostname, no contexto da plataforma (healthcheck do Docker, verificação do Caddy). */
+const HOSTLESS_PATHS = ['/api/health', '/api/platform/tls-check']
+
+function simplePage(title: string, text: string) {
+  return `<!doctype html><html lang="pt-BR"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>${title}</title>
+<style>body{font-family:system-ui,sans-serif;display:grid;place-items:center;min-height:100vh;margin:0;background:#f6f7f9;color:#1f2937}
+main{max-width:460px;padding:32px;text-align:center}h1{font-size:20px;margin:0 0 8px}p{color:#6b7280;line-height:1.5}
+@media (prefers-color-scheme:dark){body{background:#111318;color:#e5e7eb}p{color:#9ca3af}}</style></head>
+<body><main><h1>${title}</h1><p>${text}</p></main></body></html>`
 }
 
 export const SESSION_COOKIE = 'na_session'
@@ -61,12 +76,15 @@ export async function buildApp(cfg: AppConfig): Promise<FastifyInstance> {
   })
 
   const publicOrigin = new URL(cfg.server.publicUrl).origin
+  const base = cfg.server.baseDomain
   const allowedOrigin = (origin: string | undefined) => {
     if (!origin) return true
     if (origin === publicOrigin) return true
     try {
       const u = new URL(origin)
-      // mesmo host (acessado por IP/nome diferente na rede local) ou ambiente de desenvolvimento do Vite
+      // subdomínios dos clientes e o painel; o tempo real ainda confere se a origem é o próprio cliente
+      if (u.hostname === base || u.hostname.endsWith(`.${base}`)) return true
+      // ambiente de desenvolvimento do Vite
       if (u.hostname === 'localhost' || u.hostname === '127.0.0.1') return true
     } catch {
       return false
@@ -111,14 +129,63 @@ export async function buildApp(cfg: AppConfig): Promise<FastifyInstance> {
   await app.register(multipart, { limits: { fileSize: 32 * 1024 * 1024, files: 5 } })
   await app.register(rateLimit, { global: true, max: 600, timeWindow: '1 minute', allowList: (req) => !req.url.startsWith('/api/') })
 
+  // Cliente pelo hostname: <slug>.<BASE_DOMAIN> → schema t_<slug>. Toda a requisição roda nesse contexto.
+  app.addHook('onRequest', (req, reply, done) => {
+    const path = req.url.split('?')[0] ?? ''
+    if (HOSTLESS_PATHS.includes(path)) {
+      req.execCtx = { kind: 'platform' }
+      return withPlatform(() => done())
+    }
+    resolveHost(req.headers.host).then(
+      (r) => {
+        const api = path.startsWith('/api/') || path.startsWith('/socket.io')
+        if (r.kind === 'unknown') {
+          if (api) return reply.status(404).send({ error: 'Endereço não encontrado.' })
+          return reply
+            .status(404)
+            .type('text/html; charset=utf-8')
+            .send(simplePage('Endereço não encontrado', `Não existe um ambiente em ${normalizeHost(req.headers.host)}. Confira o endereço com quem forneceu o seu acesso.`))
+        }
+        if (r.kind === 'tenant' && r.tenant.status === 'suspenso') {
+          if (api) return reply.status(503).send({ error: 'Acesso suspenso. Fale com o fornecedor do sistema.' })
+          return reply.status(503).type('text/html; charset=utf-8').send(simplePage('Acesso suspenso', 'Este ambiente está temporariamente suspenso. Fale com o fornecedor do sistema.'))
+        }
+        const ctx: ExecCtx = r.kind === 'tenant' ? r.tenant : { kind: 'platform' }
+        req.execCtx = ctx
+        runInCtx(ctx, () => done())
+      },
+      (err) => done(err),
+    )
+  })
+  // O corpo da requisição é lido entre onRequest e preValidation: reabre o contexto por garantia.
+  app.addHook('preValidation', (req, _reply, done) => {
+    if (req.execCtx) return runInCtx(req.execCtx, () => done())
+    done()
+  })
+
   // Sessão + proteção CSRF (verificação de Origin em métodos de escrita)
   app.addHook('onRequest', async (req) => {
     if (!req.url.startsWith('/api/')) return
     if (!['GET', 'HEAD', 'OPTIONS'].includes(req.method)) {
       const origin = req.headers.origin as string | undefined
-      const host = req.headers.host
-      const sameHost = origin && host && new URL(origin).host === host
-      if (origin && !sameHost && !allowedOrigin(origin)) throw forbidden('Origem da requisição não permitida.')
+      if (origin) {
+        let originHost: string
+        try {
+          originHost = new URL(origin).host
+        } catch {
+          throw forbidden('Origem da requisição não permitida.') // ex.: "Origin: null"
+        }
+        if (originHost !== req.headers.host) {
+          // Subdomínios irmãos contam como o mesmo "site" para o SameSite: num cliente, só a própria origem escreve
+          const devOrigin = process.env.NODE_ENV !== 'production' && /^(localhost|127\.0\.0\.1)$/.test(originHost.replace(/:\d+$/, ''))
+          if (req.execCtx?.kind === 'tenant' ? !devOrigin : !allowedOrigin(origin)) throw forbidden('Origem da requisição não permitida.')
+        }
+      }
+    }
+    if (req.execCtx?.kind !== 'tenant') {
+      // Painel do fornecedor: login próprio na Fase 2. Por ora só as rotas sem contexto de cliente.
+      if (HOSTLESS_PATHS.some((p) => req.url.startsWith(p))) return
+      throw unauthorized()
     }
     req.session = await resolveSession(req.cookies[SESSION_COOKIE])
     if (PUBLIC_PREFIXES.some((p) => req.url.startsWith(p))) return
@@ -161,6 +228,13 @@ export async function buildApp(cfg: AppConfig): Promise<FastifyInstance> {
         reply.header('Cache-Control', /[\\/]assets[\\/]/.test(filePath) ? 'public, max-age=31536000, immutable' : 'no-cache')
       },
     })
+    // Painel do fornecedor (Fase 2): por enquanto, só um aviso no hostname da plataforma.
+    app.addHook('onRequest', async (req, reply) => {
+      if (req.execCtx?.kind !== 'platform') return
+      const path = req.url.split('?')[0] ?? ''
+      if (path.startsWith('/api/') || path.startsWith('/socket.io')) return
+      return reply.type('text/html; charset=utf-8').send(simplePage('Painel do fornecedor', 'O painel de administração dos clientes chega na Fase 2.'))
+    })
     // A raiz é uma pasta: sem esta rota o plugin responde 403 em "/"
     app.get('/', (_req, reply) => reply.sendFile('index.html'))
     app.setNotFoundHandler((req, reply) => {
@@ -175,7 +249,7 @@ export async function buildApp(cfg: AppConfig): Promise<FastifyInstance> {
     })
     log().info({ webDist }, 'Front-end servido pelo servidor')
   } else {
-    app.get('/', async () => ({ app: 'Nimber Atende', status: 'ok', web: 'front-end não compilado (rode npm run build)' }))
+    app.get('/', async () => ({ app: 'softIA', status: 'ok', web: 'front-end não compilado (rode npm run build)' }))
   }
 
   return app

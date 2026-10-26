@@ -1,0 +1,5 @@
+# softIA — opções globais (importado DENTRO do bloco { } do Caddyfile que atende as portas 80/443).
+# Antes de emitir um certificado para um hostname novo, o Caddy pergunta ao softIA se ele é de um cliente.
+on_demand_tls {
+	ask http://softia:8080/api/platform/tls-check
+}

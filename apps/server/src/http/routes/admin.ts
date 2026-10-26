@@ -10,6 +10,7 @@ import { manager } from '../../whatsapp/manager.js'
 import { emitStaff } from '../realtime.js'
 import { badRequest, notFound } from '../errors.js'
 import { clientIp, currentUser, requireRole } from '../app.js'
+import { jobStats } from '../../lib/jobs.js'
 
 const uuid = z.string().uuid()
 const hoursSchema = z.record(z.string().regex(/^[0-6]$/), z.array(z.tuple([z.string().regex(/^\d{2}:\d{2}$/), z.string().regex(/^\d{2}:\d{2}$/)])))
@@ -44,7 +45,7 @@ export async function adminRoutes(app: FastifyInstance) {
     const body = userBody.extend({ password: z.string().optional() }).parse(req.body)
     const exists = await one(`SELECT 1 FROM users WHERE lower(email)=lower($1)`, [body.email])
     if (exists) throw badRequest('Já existe um usuário com este e-mail.')
-    const temp = body.password || `Nimber-${randomToken(6)}1`
+    const temp = body.password || `Temp-${randomToken(6)}1`
     const policy = await checkPasswordPolicy(temp)
     if (policy) throw badRequest(policy)
     const u = await one<any>(
@@ -77,7 +78,7 @@ export async function adminRoutes(app: FastifyInstance) {
   app.post('/api/users/:id/reset-password', async (req) => {
     const me = requireRole(req, 'admin')
     const { id } = z.object({ id: uuid }).parse(req.params)
-    const temp = `Nimber-${randomToken(6)}1`
+    const temp = `Temp-${randomToken(6)}1`
     await q(`UPDATE users SET password_hash=$2, must_change_password=true, failed_logins=0, locked_until=NULL WHERE id=$1`, [id, await hashPassword(temp)])
     await revokeAllSessions(id)
     await audit({ userId: me.id, action: 'user.password_reset', entity: 'user', entityId: id, ip: clientIp(req) })
@@ -334,8 +335,7 @@ export async function adminRoutes(app: FastifyInstance) {
 
   app.get('/api/system/status', async (req) => {
     requireRole(req, 'admin', 'supervisor')
-    const jobs = await q(`SELECT queue, status, count(*) AS n FROM jobs WHERE created_at > now() - interval '1 day' GROUP BY 1,2 ORDER BY 1,2`)
-    const failed = await q(`SELECT id, queue, last_error, finished_at FROM jobs WHERE status='failed' ORDER BY finished_at DESC LIMIT 20`)
+    const { jobs, failed } = await jobStats()
     const db = await one(`SELECT version() AS version, pg_database_size(current_database()) AS size`)
     const { capabilities } = await import('../../lib/db.js')
     return {

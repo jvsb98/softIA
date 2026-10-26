@@ -152,7 +152,7 @@ export const NODE_TYPES: NodeType[] = [
     category: 'Mensagens',
     icon: 'message-square',
     outputs: [{ id: 'next', label: 'Em seguida' }],
-    fields: [{ key: 'text', label: 'Mensagem', type: 'textarea', required: true, placeholder: 'Olá, {{contato.primeiro_nome}}! Bem-vindo à Nimber.' }],
+    fields: [{ key: 'text', label: 'Mensagem', type: 'textarea', required: true, placeholder: 'Olá, {{contato.primeiro_nome}}! Tudo bem?' }],
     run: async (ctx) => {
       await ctx.io.send(await ctx.interpolate(String(ctx.node.data.text ?? '')))
       return { next: 'next' }
@@ -364,7 +364,7 @@ export const NODE_TYPES: NodeType[] = [
       const cats: { name: string; description?: string }[] = ctx.node.data.categories ?? []
       const history = await ctx.io.history()
       const last = [...history].reverse().find((m) => m.role === 'user')?.content ?? ''
-      const system = `Classifique a mensagem de um contato da Nimber em UMA das categorias.\nCATEGORIAS: ${cats.map((c) => c.name).join(' | ')}\n${cats.map((c) => `- ${c.name}: ${c.description ?? ''}`).join('\n')}\nResponda SOMENTE com JSON: {"categoria": "<nome exato ou outra>"}`
+      const system = `Classifique a mensagem de um contato em UMA das categorias.\nCATEGORIAS: ${cats.map((c) => c.name).join(' | ')}\n${cats.map((c) => `- ${c.name}: ${c.description ?? ''}`).join('\n')}\nResponda SOMENTE com JSON: {"categoria": "<nome exato ou outra>"}`
       const j = await ctx.io.aiJson(system, last, 'classify').catch(() => null)
       const idx = cats.findIndex((c) => norm(c.name) === norm(String(j?.categoria ?? '')))
       if (ctx.node.data.variable) ctx.state.vars[String(ctx.node.data.variable)] = idx >= 0 ? cats[idx]!.name : 'outra'
@@ -383,7 +383,7 @@ export const NODE_TYPES: NodeType[] = [
     run: async (ctx) => {
       const fields: { name: string; description: string }[] = ctx.node.data.fields ?? []
       const history = await ctx.io.history()
-      const transcript = history.map((m) => `${m.role === 'user' ? 'Contato' : 'Nimber'}: ${m.content}`).join('\n')
+      const transcript = history.map((m) => `${m.role === 'user' ? 'Contato' : 'Empresa'}: ${m.content}`).join('\n')
       const system = `Extraia da conversa os campos abaixo. Use null quando não houver informação clara.\n${fields.map((f) => `- ${f.name}: ${f.description}`).join('\n')}\nResponda SOMENTE com JSON com essas chaves.`
       const j = (await ctx.io.aiJson(system, transcript, 'extract').catch(() => null)) ?? {}
       for (const f of fields) if (j[f.name] !== undefined && j[f.name] !== null) ctx.state.vars[f.name] = j[f.name]
@@ -522,7 +522,7 @@ export const NODE_TYPES: NodeType[] = [
         options: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE'].map((m) => ({ value: m, label: m })),
         default: 'POST',
       },
-      { key: 'url', label: 'URL', type: 'text', required: true, placeholder: 'https://n8n.nimber.com.br/webhook/lead' },
+      { key: 'url', label: 'URL', type: 'text', required: true, placeholder: 'https://n8n.suaempresa.com.br/webhook/lead' },
       { key: 'headers', label: 'Cabeçalhos', type: 'keyvalue' },
       { key: 'body', label: 'Corpo (JSON, aceita variáveis)', type: 'code', placeholder: '{"telefone": "{{contato.telefone}}", "score": "{{contato.score}}"}' },
       { key: 'variable', label: 'Guardar resposta em', type: 'text', default: 'resposta_http' },

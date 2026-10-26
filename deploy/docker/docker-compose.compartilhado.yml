@@ -1,0 +1,13 @@
+# Droplet compartilhado: o softIA entra na rede Docker da Central para o Caddy dela alcançá-lo
+# pelo nome "softia". Use junto com docker-compose.yml (veja o cabeçalho dele).
+services:
+  softia:
+    networks:
+      default: {}
+      borda:
+        aliases: [softia]
+
+networks:
+  borda:
+    external: true
+    name: ${EDGE_NETWORK:-central-whatsapp_default}

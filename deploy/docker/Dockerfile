@@ -1,8 +1,9 @@
 # syntax=docker/dockerfile:1.7
 # =====================================================================
-#  Nimber Atende — imagem do servidor (Linux / DigitalOcean)
-#  Build (na raiz do repositório):
-#    docker build -f deploy/docker/Dockerfile -t nimber-atende .
+#  softIA — imagem do servidor (Linux / DigitalOcean)
+#  Gerada pelo GitHub Actions (.github/workflows/docker.yml) — não compile no Droplet.
+#  Build manual (na raiz do repositório):
+#    docker build -f deploy/docker/Dockerfile -t softia .
 # =====================================================================
 
 # ---------- 1. build: compila web + servidor e monta o pacote de produção
@@ -28,8 +29,8 @@ ENV NODE_ENV=production \
     HOST=0.0.0.0
 
 WORKDIR /app
-COPY --from=build --chown=node:node /src/out/nimber-atende/server ./server
-COPY --from=build --chown=node:node /src/out/nimber-atende/config-exemplo ./config-exemplo
+COPY --from=build --chown=node:node /src/out/softia/server ./server
+COPY --from=build --chown=node:node /src/out/softia/config-exemplo ./config-exemplo
 # /config: master.key (se não vier por NIMBER_MASTER_KEY), database.txt opcional, certificado do banco
 # /data:   logs e arquivos temporários
 RUN mkdir -p /config /data && chown node:node /config /data

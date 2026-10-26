@@ -80,7 +80,7 @@ function DocumentsTab() {
           }}
         >
           <Upload className="size-5 text-muted" />
-          <div className="flex-1 text-[13.5px] text-ink-2">Arraste PDFs, DOCX, TXT ou Markdown aqui — material institucional, ofertas, regulamentos, explicações sobre tokenização.</div>
+          <div className="flex-1 text-[13.5px] text-ink-2">Arraste PDFs, DOCX, TXT ou Markdown aqui — material institucional, catálogo de serviços, preços de referência, perguntas frequentes.</div>
           <input ref={fileRef} type="file" multiple hidden accept=".pdf,.docx,.txt,.md,.html" onChange={(e) => e.target.files && void upload(e.target.files)} />
           <Button icon={<FileText className="size-4" />} onClick={() => fileRef.current?.click()}>
             Enviar arquivo
@@ -96,7 +96,7 @@ function DocumentsTab() {
       <div className="rounded-[12px] border border-line bg-panel">
         {!docs.data?.length ? (
           <Empty title="Nenhum documento ainda" glyph={<PixelGlyph pattern="ai" size={40} className="text-line-strong" />}>
-            Comece pelo material que o time comercial mais usa para explicar a Nimber.
+            Comece pelo material que o time mais usa para explicar a empresa: serviços, prazos, formas de pagamento.
           </Empty>
         ) : (
           <Table head={['Documento', 'Origem', 'Situação', 'Trechos', 'Atualizado', '']}>
@@ -148,7 +148,7 @@ function DocumentsTab() {
 function AddDocDialog({ mode, onClose, onDone }: { mode: 'text' | 'site'; onClose: () => void; onDone: () => void }) {
   const [title, setTitle] = useState('')
   const [text, setText] = useState('')
-  const [url, setUrl] = useState('https://nimber.com.br')
+  const [url, setUrl] = useState('https://')
   const [refresh, setRefresh] = useState(7)
   const [busy, setBusy] = useState(false)
   return (
@@ -185,11 +185,11 @@ function AddDocDialog({ mode, onClose, onDone }: { mode: 'text' | 'site'; onClos
     >
       <div className="space-y-4">
         <Field label="Título">
-          <Input value={title} onChange={(e) => setTitle(e.target.value)} placeholder={mode === 'site' ? 'Site institucional — página inicial' : 'Como funciona a tokenização'} />
+          <Input value={title} onChange={(e) => setTitle(e.target.value)} placeholder={mode === 'site' ? 'Site institucional — página inicial' : 'Como funciona o orçamento'} />
         </Field>
         {mode === 'text' ? (
           <Field label="Conteúdo">
-            <Textarea rows={14} value={text} onChange={(e) => setText(e.target.value)} placeholder={'# O que é a Nimber\n...\n\n# Como investir\n...'} />
+            <Textarea rows={14} value={text} onChange={(e) => setText(e.target.value)} placeholder={'# Nossos serviços\n...\n\n# Prazos e formas de pagamento\n...'} />
           </Field>
         ) : (
           <div className="grid grid-cols-[1fr_160px] gap-3">
@@ -291,7 +291,7 @@ function FaqDialog({ item, onClose, onDone }: { item: any; onClose: () => void; 
     >
       <div className="space-y-4">
         <Field label="Pergunta">
-          <Input value={f.question} onChange={(e) => setF({ ...f, question: e.target.value })} placeholder="Qual o valor mínimo para investir?" />
+          <Input value={f.question} onChange={(e) => setF({ ...f, question: e.target.value })} placeholder="Qual o prazo de entrega?" />
         </Field>
         <Field label="Resposta oficial">
           <Textarea rows={6} value={f.answer} onChange={(e) => setF({ ...f, answer: e.target.value })} />
@@ -325,7 +325,7 @@ function TestTab() {
           }
         }}
       >
-        <Input value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Qual o prazo para resgatar o investimento?" />
+        <Input value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Vocês atendem convênio?" />
         <Button variant="primary" icon={<Search className="size-4" />} loading={busy}>
           Buscar
         </Button>

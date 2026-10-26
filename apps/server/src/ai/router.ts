@@ -5,6 +5,7 @@
 import { one, q } from '../lib/db.js'
 import { log } from '../lib/logger.js'
 import { chat, embed, ProviderError, transcribe, type ChatRequest, type ChatResult, type ProviderRow } from './providers.js'
+import { ctxKey } from '../lib/tenant.js'
 
 export type Task = 'triage' | 'agent' | 'guard' | 'summary' | 'transcription' | 'embedding'
 
@@ -23,7 +24,7 @@ export function invalidateAiCache() {
 }
 
 export async function taskConfig(task: Task): Promise<TaskConfig> {
-  const c = cache.get(task)
+  const c = cache.get(ctxKey() + task)
   if (c && Date.now() - c.at < 15_000) return c.cfg
   const row = await one<any>(
     `SELECT t.*, row_to_json(p) AS p, row_to_json(f) AS f
@@ -40,7 +41,7 @@ export async function taskConfig(task: Task): Promise<TaskConfig> {
     temperature: Number(row?.temperature ?? 0.3),
     max_tokens: Number(row?.max_tokens ?? 1024),
   }
-  cache.set(task, { cfg, at: Date.now() })
+  cache.set(ctxKey() + task, { cfg, at: Date.now() })
   return cfg
 }
 

@@ -1,8 +1,8 @@
 #!/usr/bin/env node
 /**
- * Monta o pacote de produção do servidor em out/nimber-atende/:
+ * Monta o pacote de produção do servidor em out/softia/:
  *
- *   out/nimber-atende/
+ *   out/softia/
  *     server/dist/        servidor compilado (+ migrations)
  *     server/web/         front-end compilado (servido pelo próprio servidor)
  *     server/patches/     correção do Baileys (aplicada no npm install)
@@ -18,7 +18,7 @@ import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 
 const root = join(dirname(fileURLToPath(import.meta.url)), '..')
-const out = join(root, 'out', 'nimber-atende')
+const out = join(root, 'out', 'softia')
 const server = join(out, 'server')
 const skipInstall = process.argv.includes('--skip-install')
 
@@ -56,7 +56,7 @@ writeFileSync(
   join(server, 'package.json'),
   JSON.stringify(
     {
-      name: 'nimber-atende-server',
+      name: 'softia-server',
       version: rootPkg.version,
       private: true,
       type: 'module',

@@ -11,7 +11,7 @@ if (!/^\d+\.\d+\.\d+(-[\w.]+)?$/.test(v ?? '')) {
   process.exit(1)
 }
 const root = join(dirname(fileURLToPath(import.meta.url)), '..')
-for (const p of ['package.json', 'apps/server/package.json', 'apps/web/package.json', 'apps/desktop/package.json']) {
+for (const p of ['package.json', 'apps/server/package.json', 'apps/web/package.json']) {
   const file = join(root, p)
   const json = JSON.parse(readFileSync(file, 'utf8'))
   json.version = v

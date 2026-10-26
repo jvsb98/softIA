@@ -30,7 +30,7 @@ export function createLogger(level: string, dataDir?: string): Logger {
   root = pino(
     {
       level,
-      base: { app: 'nimber-atende' },
+      base: { app: 'softia' },
       timestamp: pino.stdTimeFunctions.isoTime,
       // Segredos nunca vão para o log, mesmo que algum objeto seja registrado por engano
       redact: {

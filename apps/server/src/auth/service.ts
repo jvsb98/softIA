@@ -2,6 +2,7 @@ import bcrypt from 'bcryptjs'
 import { decryptSecret, encryptSecret, randomToken, sha256 } from '../lib/crypto.js'
 import { one, q } from '../lib/db.js'
 import { getSetting } from '../ops/settings.js'
+import { tenantOrNull } from '../lib/tenant.js'
 import { generateSecret, otpauthUrl, verifyTotp } from './totp.js'
 
 export type Role = 'admin' | 'supervisor' | 'agent'
@@ -102,6 +103,7 @@ export async function resolveSession(token: string | undefined): Promise<Resolve
   // Expiração deslizante (atualiza no máximo 1x por minuto por sessão).
   const last = touchCache.get(id) ?? 0
   if (!s.mfa_pending && Date.now() - last > 60_000) {
+    if (touchCache.size > 20_000) touchCache.clear() // limite: muitas sessões não crescem a memória sem fim
     touchCache.set(id, Date.now())
     const sec = await getSetting('security', { sessionHours: 12 })
     void q(
@@ -175,7 +177,7 @@ export async function login(email: string, password: string, ip?: string, ua?: s
 export async function beginTotpSetup(userId: string, email: string) {
   const secret = generateSecret()
   await q(`UPDATE users SET totp_secret_enc=$2 WHERE id=$1 AND NOT totp_enabled`, [userId, encryptSecret(secret)])
-  return { secret, otpauth: otpauthUrl(secret, email) }
+  return { secret, otpauth: otpauthUrl(secret, email, tenantOrNull()?.name || 'softIA') }
 }
 
 function makeRecoveryCodes(): string[] {

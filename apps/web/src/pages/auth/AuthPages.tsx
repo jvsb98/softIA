@@ -17,7 +17,7 @@ function AuthFrame({ title, subtitle, children }: { title: string; subtitle?: Re
           {subtitle && <p className="mt-3 text-[15px] leading-relaxed text-muted">{subtitle}</p>}
           <div className="mt-8">{children}</div>
         </div>
-        <p className="text-[12px] text-muted">Ambiente interno da Nimber. Acesso monitorado.</p>
+        <p className="text-[12px] text-muted">Acesso restrito à equipe. Acessos são registrados.</p>
       </div>
       <FractionField />
     </div>
@@ -48,8 +48,8 @@ function FractionField() {
         ))}
       </div>
       <div className="absolute inset-x-10 bottom-10 max-w-md text-linen">
-        <div className="font-display text-[30px] leading-tight">Cada conversa, uma fração de valor.</div>
-        <p className="mt-2 text-[14px] text-linen/70">Atendimento, qualificação e IA num só lugar, no número que seus clientes já conhecem.</p>
+        <div className="font-display text-[30px] leading-tight">Nenhum cliente sem resposta.</div>
+        <p className="mt-2 text-[14px] text-linen/70">Atendimento, agenda e acompanhamento num só lugar, no WhatsApp que seus clientes já usam.</p>
       </div>
     </div>
   )
@@ -57,7 +57,7 @@ function FractionField() {
 
 export function SetupPage() {
   const { refresh } = useSession()
-  const [form, setForm] = useState({ orgName: 'Nimber', name: '', email: '', password: '' })
+  const [form, setForm] = useState({ orgName: '', name: '', email: '', password: '' })
   const [busy, setBusy] = useState(false)
   const submit = async (e: FormEvent) => {
     e.preventDefault()
@@ -72,7 +72,7 @@ export function SetupPage() {
     }
   }
   return (
-    <AuthFrame title="Vamos configurar o Nimber Atende" subtitle="Crie a conta de administrador. Em seguida você ativa a verificação em duas etapas e conecta o primeiro número de WhatsApp.">
+    <AuthFrame title="Vamos configurar o atendimento" subtitle="Crie a conta de administrador. Em seguida você ativa a verificação em duas etapas e conecta o primeiro número de WhatsApp.">
       <form onSubmit={submit} className="space-y-4">
         <Field label="Nome da empresa">
           <Input value={form.orgName} onChange={(e) => setForm({ ...form, orgName: e.target.value })} />

@@ -1,3 +1,5 @@
+> **Documento histórico do Nimber Atende (base do softIA).** A arquitetura do SaaS multi-cliente está no documento "SaaS de Atendimento WhatsApp — Arquitetura (Fase 0)" no claude.ai e em [MULTI-CLIENTE.md](MULTI-CLIENTE.md).
+
 # Nimber Atende — Documento de Arquitetura (Fase 0)
 
 > Versão 1.0 · outubro/2026 · Tecnologia Nimber

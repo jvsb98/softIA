@@ -67,7 +67,7 @@ export function TransferDialog({ open, onClose, conversation }: { open: boolean;
           </Select>
         </Field>
         <Field label="Contexto para o colega (nota interna)">
-          <Textarea value={note} onChange={(e) => setNote(e.target.value)} placeholder="Ex.: cliente quer simular investimento de R$ 50 mil no Hive SP." />
+          <Textarea value={note} onChange={(e) => setNote(e.target.value)} placeholder="Ex.: cliente quer orçamento de bancada em granito, 2,40 m." />
         </Field>
       </div>
     </Dialog>
